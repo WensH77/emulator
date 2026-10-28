@@ -309,6 +309,8 @@ Result KThread::InitializeServiceThread(Core::System& system, KThread* thread,
     system.Kernel().GlobalSchedulerContext().AddThread(thread);
     std::function<void()> func2{[&system, func_{std::move(func)}] {
         // Similar to UserModeThreadStarter.
+        LOG_INFO(Kernel, "[ohos] 服务线程开始执行 tid={}",
+                 static_cast<int>(GetCurrentThreadPointer(system.Kernel())->GetThreadId()));
         system.Kernel().CurrentScheduler()->OnThreadStart();
 
         // Run the guest function.
@@ -1385,7 +1387,11 @@ void KThread::CancelWait(Result wait_result, bool cancel_timer_task) {
     }
 }
 
+static std::atomic<int> g_state_log_budget{400};
+
 void KThread::SetState(ThreadState state) {
+    // 注意：SetState 在持有调度器自旋锁时调用，绝对不能在这里做日志 I/O（会死锁）
+    (void)g_state_log_budget;
     KScopedSchedulerLock sl{m_kernel};
 
     // Clear debugging state

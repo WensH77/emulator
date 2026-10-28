@@ -68,6 +68,15 @@ public:
         }
     }
 
+public:
+    // OHOS 诊断：谁持有调度器锁、锁了几层
+    Kernel::KThread* DebugOwnerThread() const {
+        return m_owner_thread.load(std::memory_order_acquire);
+    }
+    s32 DebugLockCount() const {
+        return m_lock_count;
+    }
+
 private:
     friend class GlobalSchedulerContext;
 

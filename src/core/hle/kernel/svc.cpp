@@ -2519,6 +2519,18 @@ static void SvcWrap_ConnectToNamedPort64(Core::System& system, std::span<uint64_
     name = Convert<uint64_t>(GetArg64(args, 1));
 
     ret = ConnectToNamedPort64(system, std::addressof(out_handle), name);
+    {
+        auto& memory = system.ApplicationMemory();
+        char port_name[13] = {};
+        for (int i = 0; i < 12; ++i) {
+            port_name[i] = static_cast<char>(memory.Read8(name + i));
+            if (port_name[i] == '\0') {
+                break;
+            }
+        }
+        LOG_INFO(Kernel_SVC, "[ohos] ConnectToNamedPort 名称='{}' 结果={} 句柄={}", port_name,
+                 ret == ResultSuccess, out_handle);
+    }
 
     SetArg64(args, 0, Convert<uint64_t>(ret));
     SetArg64(args, 1, Convert<uint64_t>(out_handle));
@@ -2532,6 +2544,8 @@ static void SvcWrap_SendSyncRequest64(Core::System& system, std::span<uint64_t, 
     session_handle = Convert<Handle>(GetArg64(args, 0));
 
     ret = SendSyncRequest64(system, session_handle);
+    LOG_INFO(Kernel_SVC, "[ohos] SendSyncRequest 句柄=0x{:x} 成功={}", session_handle,
+             ret == ResultSuccess);
 
     SetArg64(args, 0, Convert<uint64_t>(ret));
 }
@@ -2646,6 +2660,9 @@ static void SvcWrap_GetInfo64(Core::System& system, std::span<uint64_t, 8> args)
 
     ret = GetInfo64(system, std::addressof(out), info_type, handle, info_subtype);
 
+    LOG_INFO(Kernel_SVC, "[ohos] GetInfo id={} sub={} 成功={} 值={:#x}",
+             static_cast<u64>(GetArg64(args, 1)), static_cast<u64>(GetArg64(args, 2)),
+             ret == ResultSuccess, out);
     SetArg64(args, 0, Convert<uint64_t>(ret));
     SetArg64(args, 1, Convert<uint64_t>(out));
 }
@@ -2957,7 +2974,11 @@ static void SvcWrap_ReplyAndReceive64(Core::System& system, std::span<uint64_t, 
     reply_target = Convert<Handle>(GetArg64(args, 3));
     timeout_ns = Convert<int64_t>(GetArg64(args, 4));
 
+    LOG_INFO(Kernel_SVC, "[ohos] ReplyAndReceive 等待: 句柄=0x{:x} 数量={} 回复目标=0x{:x} 超时={}",
+             handles, num_handles, reply_target, timeout_ns);
     ret = ReplyAndReceive64(system, std::addressof(out_index), handles, num_handles, reply_target, timeout_ns);
+    LOG_INFO(Kernel_SVC, "[ohos] ReplyAndReceive 返回: 成功={} index={}", ret == ResultSuccess,
+             out_index);
 
     SetArg64(args, 0, Convert<uint64_t>(ret));
     SetArg64(args, 1, Convert<uint64_t>(out_index));
@@ -4439,8 +4460,31 @@ static void Call64(Core::System& system, u32 imm, std::span<uint64_t, 8> args) {
 }
 // clang-format on
 
+namespace {
+// OHOS 诊断：记录最近 32 条 SVC 序号，panic 时打印（此处不做 I/O）
+constexpr std::size_t OhosSvcTraceSize = 32;
+std::atomic<u32> g_ohos_svc_ids[OhosSvcTraceSize];
+std::atomic<u32> g_ohos_svc_index{0};
+} // Anonymous namespace
+
+void OhosRecordSvc(u32 imm) {
+    const u32 index = g_ohos_svc_index.fetch_add(1, std::memory_order_relaxed);
+    g_ohos_svc_ids[index % OhosSvcTraceSize].store(imm, std::memory_order_relaxed);
+}
+
+std::string OhosDumpSvcTrace() {
+    std::string out;
+    const u32 count = g_ohos_svc_index.load(std::memory_order_relaxed);
+    const u32 start = count > OhosSvcTraceSize ? count - OhosSvcTraceSize : 0;
+    for (u32 i = start; i < count; ++i) {
+        out += fmt::format("0x{:x} ", g_ohos_svc_ids[i % OhosSvcTraceSize].load(std::memory_order_relaxed));
+    }
+    return out;
+}
+
 void Call(Core::System& system, u32 imm) {
     CITRON_PROFILE_SCOPE("Kernel::Svc::Call");
+    OhosRecordSvc(imm);
     auto& kernel = system.Kernel();
     auto& process = GetCurrentProcess(kernel);
 

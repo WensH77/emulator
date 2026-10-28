@@ -88,6 +88,8 @@ void ServiceFrameworkBase::InvokeRequest(HLERequestContext& ctx) {
     auto itr = handlers.find(ctx.GetCommand());
     const FunctionInfoBase* info = itr == handlers.end() ? nullptr : &itr->second;
     if (info == nullptr || info->handler_callback == nullptr) {
+        LOG_ERROR(Service, "[ohos] 未实现命令: 服务={} 命令=0x{:x}", GetServiceName(),
+                  ctx.GetCommand());
         return ReportUnimplementedFunction(ctx, info);
     }
 

@@ -52,12 +52,24 @@ void Break(Core::System& system, BreakReason reason, u64 info1, u64 info2) {
     };
 
     switch (break_reason) {
-    case BreakReason::Panic:
-        LOG_CRITICAL(Debug_Emulated, "Userspace PANIC! info1=0x{:016X}, info2=0x{:016X}", info1,
-                     info2);
+    case BreakReason::Panic: {
+        // OHOS 诊断：把 panic 指向的字符串读出来，直接看到 homebrew 抱怨什么
+        char message[256] = {};
+        auto& memory = GetCurrentMemory(system.Kernel());
+        for (std::size_t i = 0; i < sizeof(message) - 1; ++i) {
+            const char c = static_cast<char>(memory.Read8(info1 + i));
+            if (c == '\0') {
+                break;
+            }
+            message[i] = (c >= ' ' && c < 127) ? c : '?';
+        }
+        LOG_CRITICAL(Debug_Emulated, "Userspace PANIC! info1=0x{:016X}, info2=0x{:016X} 文本='{}'",
+                     info1, info2, message);
+        LOG_CRITICAL(Debug_Emulated, "最近的 SVC: {}", Svc::OhosDumpSvcTrace());
         handle_debug_buffer();
         try_recover();
         break;
+    }
     case BreakReason::Assert:
         LOG_CRITICAL(Debug_Emulated, "Userspace Assertion failed! info1=0x{:016X}, info2=0x{:016X}",
                      info1, info2);

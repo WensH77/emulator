@@ -75,6 +75,7 @@ void CpuManager::HandleInterrupt() {
 ///////////////////////////////////////////////////////////////////////////////
 
 void CpuManager::MultiCoreRunGuestThread() {
+    LOG_INFO(Core, "[ohos] 核线程进入 guest 执行循环");
     // Similar to UserModeThreadStarter in HOS
     auto& kernel = system.Kernel();
     auto* thread = Kernel::GetCurrentThreadPointer(kernel);
@@ -115,12 +116,18 @@ void CpuManager::MultiCoreRunIdleThread() {
 ///////////////////////////////////////////////////////////////////////////////
 
 void CpuManager::SingleCoreRunGuestThread() {
+    LOG_INFO(Core, "[ohos] 单核 guest 线程开始");
+    int loop_count = 0;
     auto& kernel = system.Kernel();
     auto* thread = Kernel::GetCurrentThreadPointer(kernel);
     kernel.CurrentScheduler()->OnThreadStart();
 
     while (true) {
         auto* physical_core = &kernel.CurrentPhysicalCore();
+        if (++loop_count <= 3) {
+            LOG_INFO(Core, "[ohos] 单核第 {} 轮, interrupted={}", loop_count,
+                     physical_core->IsInterrupted());
+        }
         if (!physical_core->IsInterrupted()) {
             CITRON_PROFILE_SCOPE("CpuManager::CoreTick");
             physical_core->RunThread(thread);
@@ -137,6 +144,7 @@ void CpuManager::SingleCoreRunGuestThread() {
 }
 
 void CpuManager::SingleCoreRunIdleThread() {
+    LOG_INFO(Core, "[ohos] 单核 idle 线程开始");
     auto& kernel = system.Kernel();
     kernel.CurrentScheduler()->OnThreadStart();
 
@@ -222,9 +230,12 @@ void CpuManager::RunThread(std::stop_token token, std::size_t core) {
     };
 
     // Running
+    LOG_INFO(Core, "[ohos] 核 {} 等待 GPU 屏障", core);
     if (!gpu_barrier->Sync(token)) {
+        LOG_INFO(Core, "[ohos] 核 {} 屏障被取消", core);
         return;
     }
+    LOG_INFO(Core, "[ohos] 核 {} 屏障已通过", core);
 
     if (!is_async_gpu && !is_multicore) {
         system.GPU().ObtainContext();
@@ -235,7 +246,9 @@ void CpuManager::RunThread(std::stop_token token, std::size_t core) {
     auto* thread = scheduler.GetSchedulerCurrentThread();
     Kernel::SetCurrentThread(kernel, thread);
 
+    LOG_INFO(Core, "[ohos] 核 {} 切换到调度器主线程 tid={}", core, thread->GetThreadId());
     Common::Fiber::YieldTo(data.host_context, *thread->GetHostContext());
+    LOG_INFO(Core, "[ohos] 核 {} 从调度器返回", core);
 }
 
 } // namespace Core

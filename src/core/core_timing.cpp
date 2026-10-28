@@ -260,10 +260,15 @@ std::optional<s64> CoreTiming::Advance() {
 }
 
 void CoreTiming::ThreadLoop() {
+    LOG_INFO(Core, "[ohos] HostTiming 线程开始");
+    u64 loop_count = 0;
     has_started = true;
     while (!shutting_down) {
         while (!paused) {
             paused_set = false;
+            if (++loop_count % 2000 == 0) {
+                LOG_INFO(Core, "[ohos] HostTiming 循环 {} 次", loop_count);
+            }
             const auto next_time = Advance();
             if (next_time) {
                 // There are more events left in the queue, wait until the next event.

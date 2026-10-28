@@ -17,6 +17,9 @@ class System;
 
 namespace Kernel::Svc {
 
+void OhosRecordSvc(u32 imm);
+std::string OhosDumpSvcTrace();
+
 // clang-format off
 Result SetHeapSize(Core::System& system, uint64_t* out_address, uint64_t size);
 Result SetMemoryPermission(Core::System& system, uint64_t address, uint64_t size, MemoryPermission perm);

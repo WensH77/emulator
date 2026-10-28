@@ -26,6 +26,12 @@
 #include "common/fs/path_util.h"
 #include "common/literals.h"
 #include "common/logging.h"
+
+#ifdef __OHOS__
+#include <hilog/log.h>
+#include <cstdio>
+#include <cstdlib>
+#endif
 #include "common/settings.h"
 #include "common/string_util.h"
 
@@ -393,6 +399,33 @@ struct LogcatBackend : public Backend {
     void Flush() noexcept override {}
 };
 #endif
+#ifdef __OHOS__
+/// @brief Backend that forwards Citron's log to HarmonyOS hilog
+struct HilogBackend final : public Backend {
+    static FILE* Sink() noexcept {
+        static FILE* file = []() -> FILE* {
+            const char* path = getenv("CITRON_LOG_FILE");
+            if (!path || !*path) {
+                return nullptr;
+            }
+            return std::fopen(path, "a");
+        }();
+        return file;
+    }
+
+    void Write(const Entry& entry) noexcept override {
+        const auto df = GetDirectFormatArgs(entry);
+        OH_LOG_Print(LOG_APP, LOG_INFO, 0xD008, "citron", "[%{public}s] %{public}s: %{public}s",
+                     df.level_name, df.class_name, entry.message.c_str());
+        if (FILE* f = Sink()) {
+            std::fprintf(f, "[%s] %s: %s\n", df.level_name, df.class_name, entry.message.c_str());
+            std::fflush(f);
+        }
+    }
+    void Flush() noexcept override {}
+};
+#endif
+
 /// @brief Static state as a singleton.
 struct Impl {
     // Well, I mean it's the default constructor!
@@ -409,6 +442,9 @@ struct Impl {
 #ifdef ANDROID
         lambda(static_cast<Backend&>(lc_backend));
 #endif
+#ifdef __OHOS__
+        lambda(static_cast<Backend&>(hilog_backend));
+#endif
     }
     Filter filter;
     ColorConsoleBackend color_console_backend{};
@@ -417,6 +453,9 @@ struct Impl {
 #endif
 #ifdef _WIN32
     DebuggerBackend debugger_backend{};
+#endif
+#ifdef __OHOS__
+    HilogBackend hilog_backend{};
 #endif
 #ifdef ANDROID
     LogcatBackend lc_backend{};

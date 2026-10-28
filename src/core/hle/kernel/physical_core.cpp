@@ -213,6 +213,7 @@ void PhysicalCore::LogBacktrace() {
 }
 
 void PhysicalCore::Idle() {
+    LOG_INFO(Kernel, "[ohos] 核 {} 进入 Idle", m_core_index);
     std::unique_lock lk{m_guard};
     m_on_interrupt.wait(lk, [this] { return m_is_interrupted; });
 }

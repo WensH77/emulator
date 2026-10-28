@@ -17,13 +17,16 @@
 namespace Service::HID {
 
 void LoopProcess(Core::System& system) {
+    LOG_INFO(Service_HID, "[ohos] HID::LoopProcess 开始执行");
     auto server_manager = std::make_unique<ServerManager>(system);
     std::shared_ptr<HidFirmwareSettings> firmware_settings =
         std::make_shared<HidFirmwareSettings>(system);
     std::shared_ptr<ResourceManager> resource_manager =
         std::make_shared<ResourceManager>(system, firmware_settings);
 
+    LOG_INFO(Service_HID, "[ohos] HID: 初始化 ResourceManager");
     resource_manager->Initialize();
+    LOG_INFO(Service_HID, "[ohos] HID: ResourceManager 初始化完成");
 
     server_manager->RegisterNamedService(
         "hid", std::make_shared<IHidServer>(system, resource_manager, firmware_settings));

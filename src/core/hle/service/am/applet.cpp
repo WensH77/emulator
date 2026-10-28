@@ -19,6 +19,7 @@ Applet::Applet(Core::System& system, std::unique_ptr<Process> process_, bool is_
       accumulated_suspended_tick_changed_event(context), sleep_lock_event(context),
       state_changed_event(context), main_applet_request_exit_event(context) {
 
+    LOG_INFO(Service_AM, "[ohos] Applet ctor: 初始化列表完成");
     aruid.pid = process->GetProcessId();
     program_id = process->GetProgramId();
 }

@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <atomic>
+
 #include <memory>
 
 #include "common/bit_field.h"
@@ -22,6 +24,10 @@ class ShaderNotify;
 } // namespace VideoCore
 
 namespace Tegra {
+
+// OHOS 性能基准：已合成的帧数与累计合成耗时（纳秒）
+extern std::atomic<u64> g_ohos_composited_frames;
+extern std::atomic<u64> g_ohos_composite_total_ns;
 class DmaPusher;
 struct CommandList;
 

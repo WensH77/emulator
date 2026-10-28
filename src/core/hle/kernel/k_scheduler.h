@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <string>
+
 #include <atomic>
 
 #include "common/common_types.h"
@@ -48,6 +50,11 @@ public:
     void Reload(KThread* thread);
 
     void SetInterruptTaskRunnable();
+
+    // OHOS 诊断：打印全局优先队列每个核的队首
+    static std::string DebugDumpPriorityQueue(KernelCore& kernel);
+    // OHOS 诊断：打印最近几次调度决策（无锁记录，供心跳线程读取）
+    static std::string OhosDumpTrace();
     void RequestScheduleOnInterrupt();
     void PreemptSingleCore();
 

@@ -274,6 +274,10 @@ if (ENABLE_WEB_SERVICE)
     add_subdirectory(web_service)
 endif()
 
+if (CITRON_OHOS)
+    add_subdirectory(ohos)
+endif()
+
 if (ANDROID)
     add_subdirectory(android/app/src/main/jni)
     target_include_directories(citron-android PRIVATE android/app/src/main)

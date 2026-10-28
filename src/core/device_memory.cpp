@@ -6,7 +6,11 @@
 
 namespace Core {
 
-#ifdef HAS_NCE
+#if defined(__OHOS__)
+// 单次 mmap 预留 256 GiB 在鸿蒙上会 OOM，先用 160 GiB；
+// 分段预留方案见 CitronOhosProbeReserve 的探测结果
+constexpr size_t VirtualReserveSize = (1ULL << 37) + (1ULL << 35);
+#elif defined(HAS_NCE)
 constexpr size_t VirtualReserveSize = 1ULL << 38;
 #else
 constexpr size_t VirtualReserveSize = 1ULL << 39;

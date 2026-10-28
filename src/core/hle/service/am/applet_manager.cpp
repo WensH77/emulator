@@ -239,6 +239,7 @@ void AppletManager::CreateAndInsertByFrontendAppletParameters(
         std::scoped_lock lk{m_lock};
         m_pending_process = std::move(process);
         m_pending_parameters = params;
+        LOG_INFO(Service_AM, "[ohos] 收到待启动进程, applet_id={}", static_cast<int>(params.applet_id));
     }
     m_cv.notify_all();
 }
@@ -265,7 +266,9 @@ void AppletManager::SetWindowSystem(WindowSystem* window_system) {
         return;
     }
 
+    LOG_INFO(Service_AM, "[ohos] SetWindowSystem: 等待待启动进程");
     m_cv.wait(lk, [&] { return m_pending_process != nullptr; });
+    LOG_INFO(Service_AM, "[ohos] SetWindowSystem: 拿到待启动进程");
 
     if (!m_window_system) {
         return;
@@ -291,9 +294,11 @@ void AppletManager::SetWindowSystem(WindowSystem* window_system) {
         }
     }
 
+    LOG_INFO(Service_AM, "[ohos] SetWindowSystem: 创建 Applet 对象");
     const auto& params = m_pending_parameters;
     auto applet = std::make_shared<Applet>(m_system, std::move(m_pending_process),
                                            params.applet_id == AppletId::Application);
+    LOG_INFO(Service_AM, "[ohos] SetWindowSystem: Applet 对象已创建");
 
     applet->program_id = params.program_id;
     applet->applet_id = params.applet_id;
@@ -392,7 +397,12 @@ void AppletManager::SetWindowSystem(WindowSystem* window_system) {
         m_window_system->RequestApplicationToGetForeground();
     }
 
-    applet->process->Run();
+    const bool run_ok = applet->process->Run();
+    if (!run_ok) {
+        LOG_ERROR(Service_AM, "[ohos] KProcess::Run 返回 false（主线程未启动）");
+    } else {
+        LOG_INFO(Service_AM, "[ohos] KProcess::Run 返回 true");
+    }
 }
 
 void AppletManager::SetHomeMenuRequestCallback(std::function<void()> callback) {

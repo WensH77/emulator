@@ -84,7 +84,6 @@ constexpr size_t HugePageSize = 0x200000;
                  static_cast<void*>(virtual_base), virtual_base_offset);
     Common::Log::Stop();
     Crash();
-    throw std::runtime_error("HostMemory invariant failed");
 }
 
 // Format, from proc(5): "start-end perms offset major:minor inode   path", numbers in hex
@@ -514,7 +513,7 @@ public:
         assert(backing_fds.size() <= MaxBackingChunks &&
                (backing_fds.empty() || chunk_size * backing_fds.size() == backing_size));
         fds.fill(-1);
-        std::ranges::copy(backing_fds, fds.begin());
+        std::copy(backing_fds.begin(), backing_fds.end(), fds.begin());
         bool good = false;
         SCOPE_EXIT {
             if (!good) {
@@ -694,8 +693,9 @@ public:
         std::shared_lock layout_lock{layout_mutex};
 
         // Merge with any adjacent placeholder mappings.
-        auto [merged_pointer, merged_size] =
-            free_manager.FreeBlock(virtual_base + virtual_offset, length);
+        const auto merged = free_manager.FreeBlock(virtual_base + virtual_offset, length);
+        auto merged_pointer = merged.first;
+        auto merged_size = merged.second;
 
         const auto reserve = [&] {
             return mmap(merged_pointer, merged_size, PROT_NONE,

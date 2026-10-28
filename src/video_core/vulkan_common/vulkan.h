@@ -10,6 +10,8 @@
 #define VK_USE_PLATFORM_METAL_EXT
 #elif defined(__ANDROID__)
 #define VK_USE_PLATFORM_ANDROID_KHR
+#elif defined(__OHOS__)
+// OHOS: 通过 SDK 的 VK_OHOS_surface 扩展创建 surface，不定义桌面平台宏
 #else
 #define VK_USE_PLATFORM_XLIB_KHR
 #define VK_USE_PLATFORM_WAYLAND_KHR

@@ -11,9 +11,14 @@
 namespace Service::AM {
 
 HidRegistration::HidRegistration(Core::System& system, Process& process) : m_process(process) {
+    LOG_INFO(Service_AM, "[ohos] HidRegistration: 请求 hid 服务");
+    // 服务线程现在能正常跑起来，恢复阻塞获取：必须完成 ARUID 注册，
+    // 否则 guest 侧申请 applet resource 共享内存会返回 0x82ECA
     m_hid_server = system.ServiceManager().GetService<HID::IHidServer>("hid", true);
+    LOG_INFO(Service_AM, "[ohos] HidRegistration: hid 服务={}",
+             m_hid_server ? "已就绪" : "未就绪（跳过注册）");
 
-    if (m_process.IsInitialized()) {
+    if (m_hid_server && m_process.IsInitialized()) {
         m_hid_server->GetResourceManager()->RegisterAppletResourceUserId(m_process.GetProcessId(),
                                                                          true);
         m_hid_server->GetResourceManager()->SetAruidValidForVibration(m_process.GetProcessId(),
@@ -31,7 +36,7 @@ HidRegistration::~HidRegistration() {
 }
 
 void HidRegistration::EnableAppletToGetInput(bool enable) {
-    if (m_process.IsInitialized()) {
+    if (m_hid_server && m_process.IsInitialized()) {
         m_hid_server->GetResourceManager()->SetAruidValidForVibration(m_process.GetProcessId(),
                                                                       enable);
         m_hid_server->GetResourceManager()->EnableInput(m_process.GetProcessId(), enable);

@@ -82,7 +82,7 @@ Id SelectValue(EmitContext& ctx, Id in_range, Id value, Id src_thread_id) {
 // a shuffle from an inactive invocation is undefined, so the plain shuffle returned garbage from
 // every neighbour that was a helper (pixels of the quad outside the primitive, killed or failing
 // the depth test).
-std::optional<u32> QuadSwapDirection(EmitContext& ctx, const IR::Inst* inst) {
+[[maybe_unused]] std::optional<u32> QuadSwapDirection(EmitContext& ctx, const IR::Inst* inst) {
     if (ctx.stage != Stage::Fragment || !ctx.profile.support_fragment_quad_swap) {
         return std::nullopt;
     }
@@ -233,12 +233,7 @@ Id EmitShuffleDown(EmitContext& ctx, IR::Inst* inst, Id value, Id index, Id clam
 
 Id EmitShuffleButterfly(EmitContext& ctx, IR::Inst* inst, Id value, Id index, Id clamp,
                         Id segmentation_mask) {
-    if (const std::optional<u32> direction{QuadSwapDirection(ctx, inst)}) {
-        // The source lane is always inside the quad
-        SetInBoundsFlag(inst, ctx.true_value);
-        return ctx.OpGroupNonUniformQuadSwap(ctx.U32[1], SubgroupScope(ctx), value,
-                                             ctx.Const(*direction));
-    }
+    // OHOS 移植：当前 sirit 版本未提供 OpGroupNonUniformQuadSwap，走通用 butterfly 模拟路径。
     const Id thread_id{EmitLaneId(ctx)};
     const Id max_thread_id{GetMaxThreadId(ctx, thread_id, clamp, segmentation_mask)};
     Id src_thread_id{ctx.OpBitwiseXor(ctx.U32[1], thread_id, index)};

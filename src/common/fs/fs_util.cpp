@@ -13,7 +13,7 @@ std::u8string ToU8String(std::string_view utf8_string) {
 }
 
 std::u8string BufferToU8String(std::span<const u8> buffer) {
-    return std::u8string{buffer.begin(), std::ranges::find(buffer, u8{0})};
+    return std::u8string{buffer.begin(), std::find(buffer.begin(), buffer.end(), u8{0})};
 }
 
 std::u8string_view BufferToU8StringView(std::span<const u8> buffer) {
@@ -25,7 +25,7 @@ std::string ToUTF8String(std::u8string_view u8_string) {
 }
 
 std::string BufferToUTF8String(std::span<const u8> buffer) {
-    return std::string{buffer.begin(), std::ranges::find(buffer, u8{0})};
+    return std::string{buffer.begin(), std::find(buffer.begin(), buffer.end(), u8{0})};
 }
 
 std::string_view BufferToUTF8StringView(std::span<const u8> buffer) {

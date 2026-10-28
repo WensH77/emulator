@@ -35,6 +35,9 @@
 
 namespace Tegra {
 
+std::atomic<u64> g_ohos_composited_frames{0};
+std::atomic<u64> g_ohos_composite_total_ns{0};
+
 struct GPU::Impl {
     explicit Impl(GPU& gpu_, Core::System& system_, bool is_async_, bool use_nvdec_)
         : gpu{gpu_}, system{system_}, host1x{system.Host1x()}, use_nvdec{use_nvdec_},
@@ -341,7 +344,14 @@ struct GPU::Impl {
             RequestSyncOperation([this, current_request_counter, &layers, &fences, num_fences] {
                 auto& syncpoint_manager = host1x.GetSyncpointManager();
                 if (num_fences == 0) {
+                    const auto bench_start = std::chrono::steady_clock::now();
                     renderer->Composite(layers);
+                    g_ohos_composite_total_ns.fetch_add(
+                        std::chrono::duration_cast<std::chrono::nanoseconds>(
+                            std::chrono::steady_clock::now() - bench_start)
+                            .count(),
+                        std::memory_order_relaxed);
+                    g_ohos_composited_frames.fetch_add(1, std::memory_order_relaxed);
                 }
                 const auto executer = [this, current_request_counter, layers_copy = layers]() {
                     {
@@ -351,7 +361,14 @@ struct GPU::Impl {
                         }
                         free_swap_counters.push_back(current_request_counter);
                     }
+                    const auto bench_start = std::chrono::steady_clock::now();
                     renderer->Composite(layers_copy);
+                    g_ohos_composite_total_ns.fetch_add(
+                        std::chrono::duration_cast<std::chrono::nanoseconds>(
+                            std::chrono::steady_clock::now() - bench_start)
+                            .count(),
+                        std::memory_order_relaxed);
+                    g_ohos_composited_frames.fetch_add(1, std::memory_order_relaxed);
                 };
                 for (size_t i = 0; i < num_fences; i++) {
                     syncpoint_manager.RegisterGuestAction(fences[i].id, fences[i].value, executer);

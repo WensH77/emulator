@@ -5,6 +5,9 @@
 #include "core/frontend/emu_window.h"
 #include "video_core/vulkan_common/vulkan_surface.h"
 #include "video_core/vulkan_common/vulkan_wrapper.h"
+#if defined(__OHOS__)
+#include "ohos/vulkan_ohos_min.h"
+#endif
 
 namespace Vulkan {
 
@@ -51,6 +54,19 @@ vk::SurfaceKHR CreateSurface(
             vkCreateAndroidSurfaceKHR(*instance, &android_ci, nullptr, &unsafe_surface) !=
                 VK_SUCCESS) {
             LOG_ERROR(Render_Vulkan, "Failed to initialize Android surface");
+            throw vk::Exception(VK_ERROR_INITIALIZATION_FAILED);
+        }
+    }
+#elif defined(__OHOS__)
+    if (window_info.type == Core::Frontend::WindowSystemType::Ohos) {
+        VkSurfaceCreateInfoOHOS ohos_ci{};
+        ohos_ci.sType = VK_STRUCTURE_TYPE_SURFACE_CREATE_INFO_OHOS;
+        ohos_ci.window = static_cast<OHNativeWindow*>(window_info.render_surface);
+        const auto vkCreateSurfaceOHOS = reinterpret_cast<PFN_vkCreateSurfaceOHOS>(
+            dld.vkGetInstanceProcAddr(*instance, "vkCreateSurfaceOHOS"));
+        if (!vkCreateSurfaceOHOS ||
+            vkCreateSurfaceOHOS(*instance, &ohos_ci, nullptr, &unsafe_surface) != VK_SUCCESS) {
+            LOG_ERROR(Render_Vulkan, "Failed to initialize OHOS surface");
             throw vk::Exception(VK_ERROR_INITIALIZATION_FAILED);
         }
     }

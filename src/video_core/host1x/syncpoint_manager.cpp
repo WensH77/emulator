@@ -20,7 +20,7 @@ SyncpointManager::ActionHandle SyncpointManager::RegisterAction(std::atomic<u32>
         action();
         return {};
     }
-    const auto it = std::ranges::upper_bound(action_storage, expected_value, {},
+    const auto it = std::ranges::upper_bound(action_storage, expected_value, std::less<>{},
                                              &RegisteredAction::expected_value);
     const ActionHandle id = ++next_action_id;
     action_storage.insert(it, RegisteredAction{id, expected_value, std::move(action)});

@@ -261,6 +261,9 @@ void ResponseBuilder::PushRaw(const T& value) {
 }
 
 inline void ResponseBuilder::PushImpl(Result value) {
+    if (value.IsError()) {
+        LOG_ERROR(Service, "[ohos] IPC 回复错误码: {:#010x}", value.raw);
+    }
     // Result codes are actually 64-bit in the IPC buffer, but only the high part is discarded.
     Push(value.raw);
     Push<u32>(0);

@@ -400,16 +400,21 @@ struct System::Impl {
             exit_result.store(SystemResultStatus::Success);
         }
         build_id = {};
+        LOG_INFO(Core, "[ohos] Load: InitializeKernel 开始");
         InitializeKernel(system, emu_window);
+        LOG_INFO(Core, "[ohos] Load: InitializeKernel 完成");
 
         const auto file = GetGameFileFromPath(virtual_filesystem, filepath);
+        LOG_INFO(Core, "[ohos] Load: 取得游戏文件");
 
         // Create the application process
         Loader::ResultStatus load_result{};
         std::vector<u8> control;
+        LOG_INFO(Core, "[ohos] Load: 创建应用进程");
         auto process =
             Service::AM::CreateApplicationProcess(control, app_loader, load_result, system, file,
                                                   params.program_id, params.program_index);
+        LOG_INFO(Core, "[ohos] Load: 应用进程创建完成 result={}", static_cast<int>(load_result));
 
         if (load_result != Loader::ResultStatus::Success) {
             LOG_CRITICAL(Core, "Failed to load ROM (Error {})!", load_result);
@@ -439,7 +444,9 @@ struct System::Impl {
         kernel.MakeApplicationProcess(process->GetHandle());
 
         // Set up the rest of the system.
+        LOG_INFO(Core, "[ohos] Load: SetupForApplicationProcess 开始");
         SystemResultStatus init_result{SetupForApplicationProcess(system, emu_window)};
+        LOG_INFO(Core, "[ohos] Load: SetupForApplicationProcess 完成");
         if (init_result != SystemResultStatus::Success) {
             LOG_CRITICAL(Core, "Failed to initialize system (Error {})!",
                          static_cast<int>(init_result));

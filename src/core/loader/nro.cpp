@@ -240,7 +240,7 @@ static bool LoadNroImpl(Core::System& system, Kernel::KProcess& process,
     // Setup the process code layout
     if (process
             .LoadFromMetadata(FileSys::ProgramMetadata::GetDefault(), image_size, fastmem_base,
-                              false)
+                              true)
             .IsError()) {
         return false;
     }

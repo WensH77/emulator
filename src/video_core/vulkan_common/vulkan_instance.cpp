@@ -12,6 +12,9 @@
 #include <ranges>
 #include "core/frontend/emu_window.h"
 #include "video_core/vulkan_common/vulkan_instance.h"
+#if defined(__OHOS__)
+#include "ohos/vulkan_ohos_min.h"
+#endif
 #include "video_core/vulkan_common/vulkan_wrapper.h"
 
 namespace Vulkan {
@@ -55,6 +58,10 @@ namespace {
 #elif defined(__ANDROID__)
     case Core::Frontend::WindowSystemType::Android:
         extensions.push_back(VK_KHR_ANDROID_SURFACE_EXTENSION_NAME);
+        break;
+#elif defined(__OHOS__)
+    case Core::Frontend::WindowSystemType::Ohos:
+        extensions.push_back(VK_OHOS_SURFACE_EXTENSION_NAME);
         break;
 #else
     case Core::Frontend::WindowSystemType::X11:

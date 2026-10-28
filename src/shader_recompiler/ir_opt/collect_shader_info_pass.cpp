@@ -22,7 +22,7 @@ void AddConstantBufferDescriptor(Info& info, u32 index, u32 count) {
     info.constant_buffer_mask |= 1U << index;
 
     auto& cbufs{info.constant_buffer_descriptors};
-    cbufs.insert(std::ranges::lower_bound(cbufs, index, {}, &ConstantBufferDescriptor::index),
+    cbufs.insert(std::ranges::lower_bound(cbufs, index, std::less<>{}, &ConstantBufferDescriptor::index),
                  ConstantBufferDescriptor{
                      .index = index,
                      .count = 1,

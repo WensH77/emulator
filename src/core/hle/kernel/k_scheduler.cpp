@@ -15,12 +15,35 @@
 #include "core/hle/kernel/k_interrupt_manager.h"
 #include "core/hle/kernel/k_process.h"
 #include "core/hle/kernel/k_scheduler.h"
+#include "core/hle/kernel/k_process.h"
+#include "fmt/format.h"
 #include "core/hle/kernel/k_scoped_scheduler_lock_and_sleep.h"
 #include "core/hle/kernel/k_thread.h"
 #include "core/hle/kernel/kernel.h"
 #include "core/hle/kernel/physical_core.h"
 
 namespace Kernel {
+
+namespace {
+// 无锁环形缓冲：记录「最高优先级线程变化」事件，避免在持锁时做日志 I/O
+struct OhosSchedEvent {
+    std::atomic<int> core{-1};
+    std::atomic<int> prev{-1};
+    std::atomic<int> next{-1};
+    std::atomic<u64> mask{0};
+};
+OhosSchedEvent g_ohos_events[16];
+std::atomic<u32> g_ohos_event_index{0};
+
+void OhosRecordEvent(u32 core, Kernel::KThread* prev, Kernel::KThread* next, u64 mask) {
+    const u32 index = g_ohos_event_index.fetch_add(1, std::memory_order_relaxed) % 16;
+    auto& event = g_ohos_events[index];
+    event.core.store(static_cast<int>(core), std::memory_order_relaxed);
+    event.prev.store(prev ? static_cast<int>(prev->GetThreadId()) : -1, std::memory_order_relaxed);
+    event.next.store(next ? static_cast<int>(next->GetThreadId()) : -1, std::memory_order_relaxed);
+    event.mask.store(mask, std::memory_order_relaxed);
+}
+} // Anonymous namespace
 
 static void IncrementScheduledCount(Kernel::KThread* thread) {
     if (auto process = thread->GetOwnerProcess(); process) {
@@ -174,6 +197,10 @@ void KScheduler::Activate() {
 
     // m_state.should_count_idle = KTargetSystem::IsDebugMode();
     m_is_active = true;
+    LOG_INFO(Kernel, "[ohos] 核 {} Activate, needs_scheduling={}", m_core_id,
+             static_cast<int>(m_state.needs_scheduling.load()));
+    // 保证进入后至少调度一次，否则 Activate 返回会落到 std::unreachable()
+    m_state.needs_scheduling.store(true, std::memory_order_relaxed);
     RescheduleCurrentCore();
 }
 
@@ -199,6 +226,7 @@ u64 KScheduler::UpdateHighestPriorityThread(KThread* highest_thread) {
             }
         }
 
+        OhosRecordEvent(static_cast<u32>(m_core_id), prev_highest_thread, highest_thread, 0);
         m_state.highest_priority_thread = highest_thread;
         m_state.needs_scheduling = true;
         return (1ULL << m_core_id);
@@ -421,6 +449,15 @@ void KScheduler::ScheduleImpl() {
 }
 
 void KScheduler::ScheduleImplFiber() {
+    const auto describe = [](Kernel::KThread* t) {
+        if (t == nullptr) {
+            return std::string{"-1"};
+        }
+        const auto pid = t->GetOwnerProcess() ? t->GetOwnerProcess()->GetProcessId() : 0;
+        return fmt::format("{} (pid={})", t->GetThreadId(), pid);
+    };
+    LOG_INFO(Kernel, "[ohos] 核 {} 切换线程 {} -> {}", m_core_id, describe(m_switch_cur_thread),
+             describe(m_switch_highest_priority_thread));
     KThread* const cur_thread{m_switch_cur_thread};
     KThread* highest_priority_thread{m_switch_highest_priority_thread};
 
@@ -898,3 +935,42 @@ void KScheduler::RescheduleCores(KernelCore& kernel, u64 core_mask) {
 }
 
 } // namespace Kernel
+
+std::string Kernel::KScheduler::DebugDumpPriorityQueue(Kernel::KernelCore& kernel) {
+    auto& queue = Kernel::KScheduler::GetPriorityQueue(kernel);
+    std::string out;
+    for (s32 core = 0; core < static_cast<s32>(Core::Hardware::NUM_CPU_CORES); ++core) {
+        auto* scheduled = queue.GetScheduledFront(core);
+        auto* suggested = queue.GetSuggestedFront(core);
+        out += fmt::format("core{}=[{},{}", core, scheduled ? scheduled->GetThreadId() : 0,
+                           suggested ? suggested->GetThreadId() : 0);
+        if (scheduled != nullptr) {
+            out += fmt::format(" st={} prio={} susp={}", static_cast<int>(scheduled->GetRawState()),
+                               scheduled->GetPriority(),
+                               static_cast<int>(scheduled->IsSuspended()));
+            if (auto* proc = scheduled->GetOwnerProcess()) {
+                if (auto* pinned = proc->GetPinnedThread(core)) {
+                    out += fmt::format(" 固定线程=tid{} st{}", pinned->GetThreadId(),
+                                       static_cast<int>(pinned->GetRawState()));
+                } else {
+                    out += " 无固定线程";
+                }
+            }
+        }
+        out += "] ";
+    }
+    return out;
+}
+
+std::string Kernel::KScheduler::OhosDumpTrace() {
+    std::string out = "调度事件:";
+    const u32 count = g_ohos_event_index.load(std::memory_order_relaxed);
+    const u32 start = count > 8 ? count - 8 : 0;
+    for (u32 i = start; i < count; ++i) {
+        auto& event = g_ohos_events[i % 16];
+        out += fmt::format(" [c{} {}->{}]", event.core.load(std::memory_order_relaxed),
+                           event.prev.load(std::memory_order_relaxed),
+                           event.next.load(std::memory_order_relaxed));
+    }
+    return out;
+}

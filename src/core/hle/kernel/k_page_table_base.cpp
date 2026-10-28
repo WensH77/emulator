@@ -9,6 +9,9 @@
 #include "core/core.h"
 #include "core/hle/kernel/k_address_space_info.h"
 #include "core/hle/kernel/k_page_table_base.h"
+#ifdef __OHOS__
+#include <hilog/log.h>
+#endif
 #include "core/hle/kernel/k_scoped_resource_reservation.h"
 #include "core/hle/kernel/k_system_resource.h"
 
@@ -400,6 +403,40 @@ Result KPageTableBase::InitializeForProcess(Svc::CreateProcessFlag as_type, bool
             }
         }
     }
+
+#ifdef __OHOS__
+    // 鸿蒙进程能预留的虚拟地址空间有限（实测单次 128~160 GiB，分段也到不了 256 GiB），
+    // 而 guest 的 alias 区最大可到 512 GiB，libnx 会在其中随机选址，
+    // 一旦选到超过 arena 的地址 HostMemory 就会断言失败。
+    // 这里把所有 guest 虚拟区域压进 arena 范围。
+    {
+        constexpr size_t OhosArenaSize = (1ULL << 37) + (1ULL << 35); // 160 GiB，与 DeviceMemory 一致
+        constexpr size_t OhosArenaCap = OhosArenaSize - (1ULL << 30); // 留 1 GiB 余量
+        auto clamp_region = [](KProcessAddress& region_start, KProcessAddress& region_end) {
+            if (GetInteger(region_end) > OhosArenaCap) {
+                region_end = static_cast<KProcessAddress>(OhosArenaCap);
+                if (GetInteger(region_start) >= OhosArenaCap) {
+                    region_start = static_cast<KProcessAddress>(OhosArenaCap - 0x1000);
+                }
+            }
+        };
+        clamp_region(m_alias_region_start, m_alias_region_end);
+        clamp_region(m_alias_code_region_start, m_alias_code_region_end);
+        clamp_region(m_heap_region_start, m_heap_region_end);
+        if (GetInteger(m_stack_region_end) != 0) {
+            clamp_region(m_stack_region_start, m_stack_region_end);
+        }
+        if (GetInteger(m_kernel_map_region_end) != 0) {
+            clamp_region(m_kernel_map_region_start, m_kernel_map_region_end);
+        }
+        OH_LOG_Print(LOG_APP, LOG_INFO, 0xD006, "VKCITRON",
+                     "guest 区域 alias=[%{public}llx,%{public}llx) heap=[%{public}llx,%{public}llx)",
+                     static_cast<unsigned long long>(GetInteger(m_alias_region_start)),
+                     static_cast<unsigned long long>(GetInteger(m_alias_region_end)),
+                     static_cast<unsigned long long>(GetInteger(m_heap_region_start)),
+                     static_cast<unsigned long long>(GetInteger(m_heap_region_end)));
+    }
+#endif
 
     // Set heap and fill members.
     m_current_heap_end = m_heap_region_start;

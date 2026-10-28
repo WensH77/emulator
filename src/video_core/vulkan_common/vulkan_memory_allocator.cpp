@@ -123,7 +123,7 @@ public:
             .begin = *alloc,
             .end = *alloc + size,
         };
-        commits.insert(std::ranges::upper_bound(commits, *alloc, {}, &Range::begin), range);
+        commits.insert(std::ranges::upper_bound(commits, *alloc, std::less<>{}, &Range::begin), range);
         return std::make_optional<MemoryCommit>(this, *memory, *alloc, *alloc + size);
     }
 

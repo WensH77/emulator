@@ -174,10 +174,12 @@ Result SM::GetServiceImpl(Kernel::KClientSession** out_client_session, HLEReques
 
     IPC::RequestParser rp{ctx};
     std::string name(PopServiceName(rp));
+    LOG_INFO(Service_SM, "[ohos] 请求服务 '{}'", name);
 
     // Find the named port.
     Kernel::KClientPort* client_port{};
     auto port_result = service_manager.GetServicePort(&client_port, name);
+    LOG_INFO(Service_SM, "[ohos] 服务 '{}' 查找结果={:#x}", name, port_result.raw);
     if (port_result == Service::SM::ResultInvalidServiceName) {
         LOG_ERROR(Service_SM, "Invalid service name '{}'", name);
         return Service::SM::ResultInvalidServiceName;

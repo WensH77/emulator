@@ -22,6 +22,7 @@ enum class WindowSystemType {
     Wayland,
     Cocoa,
     Android,
+    Ohos,
 };
 
 /**

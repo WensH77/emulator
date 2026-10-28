@@ -43,9 +43,9 @@ static std::optional<ReturnType> DecodeArm(V& visitor, u32 instruction) noexcept
     do { \
         auto const [mask, expect] = DYNARMIC_DECODER_GET_MATCHER(ArmMatcher, fn, name, Decoder::detail::StringToArray<32>(bitstring)); \
         if ((i & make_fast_index(mask)) == make_fast_index(expect)) { \
-            t[i].emplace_back([](V& visitor, u32 instruction) -> bool { \
+            t[i].emplace_back(Handler{[](V& visitor, u32 instruction) -> bool { \
                 return DYNARMIC_DECODER_GET_MATCHER_FUNCTION(ArmMatcher, fn, name, Decoder::detail::StringToArray<32>(bitstring)); \
-            }, mask, expect); \
+            }, mask, expect}); \
         } \
     } while (0);
 #include "./arm.inc"

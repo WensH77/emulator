@@ -43,12 +43,12 @@ public:
     void Release(KProcessAddress addr);
 
     bool IsAllUsed() const {
-        return std::ranges::all_of(m_is_region_free.begin(), m_is_region_free.end(),
+        return std::all_of(m_is_region_free.begin(), m_is_region_free.end(),
                                    [](bool is_free) { return !is_free; });
     }
 
     bool IsAllFree() const {
-        return std::ranges::all_of(m_is_region_free.begin(), m_is_region_free.end(),
+        return std::all_of(m_is_region_free.begin(), m_is_region_free.end(),
                                    [](bool is_free) { return is_free; });
     }
 

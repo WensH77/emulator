@@ -108,6 +108,7 @@ Result IFileSystem::OpenFile(OutInterface<IFile> out_interface,
     LOG_DEBUG(Service_FS, "called. file={}, mode={}", path->str, mode);
 
     FileSys::VirtualFile vfs_file{};
+    LOG_INFO(Service_FS, "[ohos] guest OpenFile '{}'", path->str);
     R_TRY(backend->OpenFile(&vfs_file, FileSys::Path(path->str),
                             static_cast<FileSys::OpenMode>(mode)));
 
@@ -121,6 +122,7 @@ Result IFileSystem::OpenDirectory(OutInterface<IDirectory> out_interface,
     LOG_DEBUG(Service_FS, "called. directory={}, mode={}", path->str, mode);
 
     FileSys::VirtualDir vfs_dir{};
+    LOG_INFO(Service_FS, "[ohos] guest OpenDirectory '{}'", path->str);
     R_TRY(backend->OpenDirectory(&vfs_dir, FileSys::Path(path->str),
                                  static_cast<FileSys::OpenDirectoryMode>(mode)));
 
