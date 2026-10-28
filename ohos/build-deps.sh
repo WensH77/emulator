@@ -4,7 +4,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-WORK="${1:-/tmp/citron-ohos-deps}"
+WORK="${1:-${CITRON_OHOS_DEPS:-/tmp/citron-ohos-deps}}"
 SDK=/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony
 CLANG=$SDK/native/llvm/bin/clang
 CLANGXX=$SDK/native/llvm/bin/clang++
