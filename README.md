@@ -6,6 +6,13 @@ Citron Neo is an open-source emulator that continues the Citron codebase. It
 runs on Windows, Linux, macOS and Android (arm64). Development and maintenance
 happen on [Discord](https://discord.gg/7bdSQgQZfu).
 
+## HarmonyOS port
+
+The HarmonyOS (OHOS) port lives on the **`harmony`** branch of this fork and is
+maintained there only — `main` is kept at the upstream base commit `c3aa70f`
+and is never modified. Build instructions, dependency layout, branch rules and
+the list of porting changes are in [`ohos/README.md`](ohos/README.md).
+
 ## Building
 
 Library dependencies are fetched at configure time by CPM, so you don't need to

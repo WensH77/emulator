@@ -1,5 +1,51 @@
 # Citron → HarmonyOS 移植笔记
 
+## 分支约定与用法（重要）
+
+- **移植代码只存在于 `harmony` 分支。** 上游 `main` 永远保持在基线
+  `c3aa70f`，我们不对它做任何提交、不合并、不推送改动。
+- 本地仓库两个远端：`origin` 是上游（只读，用来同步），`mine` 是
+  `https://github.com/WensH77/emulator.git`（写入口，`harmony` 跟踪它）。
+
+### 日常构建
+
+```bash
+cd citron-src            # 处于 harmony 分支
+export CITRON_OHOS_DEPS=/path/to/hmns/citron-port/deps   # openssl/ffmpeg/boost
+./ohos/configure.sh "$CITRON_OHOS_DEPS"
+./ohos/build.sh                                          # 增量构建
+cp build-ohos/src/ohos/libcitron_ohos.so ../entry/libs/arm64-v8a/
+```
+
+`configure.sh` 只需在首次或改动构建参数时执行；日常改代码后直接 `./ohos/build.sh`。
+依赖目录可以随意搬动，但搬完必须重跑 `configure.sh`（它会清掉缓存里的旧路径）。
+
+### 提交与推送
+
+```bash
+git checkout harmony
+git add -A && git commit -m "..."
+git push                 # 推到 mine/harmony
+```
+
+### 跟上游同步
+
+```bash
+git fetch origin
+git merge origin/main    # 或在 harmony 上 rebase
+```
+
+冲突会集中在本补丁改过的 58 个文件里，属正常情况。合并完成后重编一次确认可跑。
+
+### 与上游的差异
+
+```bash
+git diff c3aa70f..harmony --stat
+```
+
+也可以直接看 GitHub：
+`https://github.com/WensH77/emulator/compare/c3aa70f...harmony`
+
 ## 目录内容
 
 | 文件 | 作用 |
