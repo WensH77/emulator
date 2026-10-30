@@ -267,7 +267,7 @@ void CoreTiming::ThreadLoop() {
         while (!paused) {
             paused_set = false;
             if (++loop_count % 2000 == 0) {
-                LOG_INFO(Core, "[ohos] HostTiming 循环 {} 次", loop_count);
+                LOG_TRACE(Core, "[ohos] HostTiming 循环 {} 次", loop_count);
             }
             const auto next_time = Advance();
             if (next_time) {

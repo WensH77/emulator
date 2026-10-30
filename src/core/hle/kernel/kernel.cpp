@@ -1198,7 +1198,7 @@ void KernelCore::RunOnGuestCoreProcess(std::string&& process_name, std::function
     // 记下服务名，线程真正执行时打印，便于判断哪些服务循环跑起来了
     const std::string service_name = process_name;
     std::function<void()> named_func = [service_name, inner = std::move(func)]() {
-        LOG_INFO(Kernel, "[ohos] 服务 {} 开始执行", service_name);
+        LOG_TRACE(Kernel, "[ohos] 服务 {} 开始执行", service_name);
         inner();
     };
     [[maybe_unused]] const auto initialize_service_thread_result = KThread::InitializeServiceThread(
@@ -1212,9 +1212,9 @@ void KernelCore::RunOnGuestCoreProcess(std::string&& process_name, std::function
     KThread::Register(*this, thread);
 
     // Begin running the thread.
-    LOG_INFO(Kernel, "[ohos] guest 服务线程 {} 即将 Run", process_name);
+    LOG_TRACE(Kernel, "[ohos] guest 服务线程 {} 即将 Run", process_name);
     [[maybe_unused]] const auto run_result = thread->Run();
-    LOG_INFO(Kernel, "[ohos] guest 服务线程 {} Run 返回 成功={}", process_name,
+    LOG_TRACE(Kernel, "[ohos] guest 服务线程 {} Run 返回 成功={}", process_name,
              run_result == ResultSuccess);
     assert(R_SUCCEEDED(run_result));
 }

@@ -405,19 +405,30 @@ Result KPageTableBase::InitializeForProcess(Svc::CreateProcessFlag as_type, bool
     }
 
 #ifdef __OHOS__
+    // 只有 NCE 直映射才要求 guest 地址落在 arena 内；Dynarmic 下页表自行翻译，
+    // 保留完整 39 位布局，避免把区域裁剪后让游戏初始化断言。
+    if (Settings::IsNceEnabled())
     // 鸿蒙进程能预留的虚拟地址空间有限（实测单次 128~160 GiB，分段也到不了 256 GiB），
     // 而 guest 的 alias 区最大可到 512 GiB，libnx 会在其中随机选址，
     // 一旦选到超过 arena 的地址 HostMemory 就会断言失败。
     // 这里把所有 guest 虚拟区域压进 arena 范围。
     {
         constexpr size_t OhosArenaSize = (1ULL << 37) + (1ULL << 35); // 160 GiB，与 DeviceMemory 一致
-        constexpr size_t OhosArenaCap = OhosArenaSize - (1ULL << 30); // 留 1 GiB 余量
-        auto clamp_region = [](KProcessAddress& region_start, KProcessAddress& region_end) {
-            if (GetInteger(region_end) > OhosArenaCap) {
+        // NCE 直映射时 arena 并不落在 0，DeviceMemory 把 guest 地址整体挪到 arena 基址上
+        // （aslr_space_start 即 arena 基址）。上限必须跟着基址走，否则每个区域都会被压到
+        // 同一段地址里互相重叠，CanContain 会把这些区域判成 heap/alias 并返回 0xD401。
+        const size_t arena_base = GetInteger(aslr_space_start);
+        const size_t OhosArenaCap = arena_base + OhosArenaSize - (1ULL << 30); // 留 1 GiB 余量
+        auto clamp_region = [&](KProcessAddress& region_start, KProcessAddress& region_end) {
+            const size_t region_begin = GetInteger(region_start);
+            const size_t region_last = GetInteger(region_end);
+            if (region_last > OhosArenaCap) {
+                const size_t keep = region_last - region_begin;
                 region_end = static_cast<KProcessAddress>(OhosArenaCap);
-                if (GetInteger(region_start) >= OhosArenaCap) {
-                    region_start = static_cast<KProcessAddress>(OhosArenaCap - 0x1000);
-                }
+                region_start = static_cast<KProcessAddress>(OhosArenaCap - keep);
+            }
+            if (GetInteger(region_start) < arena_base) {
+                region_start = static_cast<KProcessAddress>(arena_base);
             }
         };
         clamp_region(m_alias_region_start, m_alias_region_end);
@@ -430,11 +441,16 @@ Result KPageTableBase::InitializeForProcess(Svc::CreateProcessFlag as_type, bool
             clamp_region(m_kernel_map_region_start, m_kernel_map_region_end);
         }
         OH_LOG_Print(LOG_APP, LOG_INFO, 0xD006, "VKCITRON",
-                     "guest 区域 alias=[%{public}llx,%{public}llx) heap=[%{public}llx,%{public}llx)",
+                     "[ohos-dbg] guest 区域 arena=[%{public}llx,%{public}llx) alias=[%{public}llx,%{public}llx) "
+                     "heap=[%{public}llx,%{public}llx) kmap=[%{public}llx,%{public}llx)",
+                     static_cast<unsigned long long>(arena_base),
+                     static_cast<unsigned long long>(OhosArenaCap),
                      static_cast<unsigned long long>(GetInteger(m_alias_region_start)),
                      static_cast<unsigned long long>(GetInteger(m_alias_region_end)),
                      static_cast<unsigned long long>(GetInteger(m_heap_region_start)),
-                     static_cast<unsigned long long>(GetInteger(m_heap_region_end)));
+                     static_cast<unsigned long long>(GetInteger(m_heap_region_end)),
+                     static_cast<unsigned long long>(GetInteger(m_kernel_map_region_start)),
+                     static_cast<unsigned long long>(GetInteger(m_kernel_map_region_end)));
     }
 #endif
 

@@ -2528,7 +2528,7 @@ static void SvcWrap_ConnectToNamedPort64(Core::System& system, std::span<uint64_
                 break;
             }
         }
-        LOG_INFO(Kernel_SVC, "[ohos] ConnectToNamedPort 名称='{}' 结果={} 句柄={}", port_name,
+        LOG_TRACE(Kernel_SVC, "[ohos] ConnectToNamedPort 名称='{}' 结果={} 句柄={}", port_name,
                  ret == ResultSuccess, out_handle);
     }
 
@@ -2544,7 +2544,7 @@ static void SvcWrap_SendSyncRequest64(Core::System& system, std::span<uint64_t, 
     session_handle = Convert<Handle>(GetArg64(args, 0));
 
     ret = SendSyncRequest64(system, session_handle);
-    LOG_INFO(Kernel_SVC, "[ohos] SendSyncRequest 句柄=0x{:x} 成功={}", session_handle,
+    LOG_TRACE(Kernel_SVC, "[ohos] SendSyncRequest 句柄=0x{:x} 成功={}", session_handle,
              ret == ResultSuccess);
 
     SetArg64(args, 0, Convert<uint64_t>(ret));
@@ -2660,7 +2660,7 @@ static void SvcWrap_GetInfo64(Core::System& system, std::span<uint64_t, 8> args)
 
     ret = GetInfo64(system, std::addressof(out), info_type, handle, info_subtype);
 
-    LOG_INFO(Kernel_SVC, "[ohos] GetInfo id={} sub={} 成功={} 值={:#x}",
+    LOG_TRACE(Kernel_SVC, "[ohos] GetInfo id={} sub={} 成功={} 值={:#x}",
              static_cast<u64>(GetArg64(args, 1)), static_cast<u64>(GetArg64(args, 2)),
              ret == ResultSuccess, out);
     SetArg64(args, 0, Convert<uint64_t>(ret));
@@ -2974,10 +2974,10 @@ static void SvcWrap_ReplyAndReceive64(Core::System& system, std::span<uint64_t, 
     reply_target = Convert<Handle>(GetArg64(args, 3));
     timeout_ns = Convert<int64_t>(GetArg64(args, 4));
 
-    LOG_INFO(Kernel_SVC, "[ohos] ReplyAndReceive 等待: 句柄=0x{:x} 数量={} 回复目标=0x{:x} 超时={}",
+    LOG_TRACE(Kernel_SVC, "[ohos] ReplyAndReceive 等待: 句柄=0x{:x} 数量={} 回复目标=0x{:x} 超时={}",
              handles, num_handles, reply_target, timeout_ns);
     ret = ReplyAndReceive64(system, std::addressof(out_index), handles, num_handles, reply_target, timeout_ns);
-    LOG_INFO(Kernel_SVC, "[ohos] ReplyAndReceive 返回: 成功={} index={}", ret == ResultSuccess,
+    LOG_TRACE(Kernel_SVC, "[ohos] ReplyAndReceive 返回: 成功={} index={}", ret == ResultSuccess,
              out_index);
 
     SetArg64(args, 0, Convert<uint64_t>(ret));

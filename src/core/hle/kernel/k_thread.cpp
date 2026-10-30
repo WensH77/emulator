@@ -309,7 +309,7 @@ Result KThread::InitializeServiceThread(Core::System& system, KThread* thread,
     system.Kernel().GlobalSchedulerContext().AddThread(thread);
     std::function<void()> func2{[&system, func_{std::move(func)}] {
         // Similar to UserModeThreadStarter.
-        LOG_INFO(Kernel, "[ohos] 服务线程开始执行 tid={}",
+        LOG_TRACE(Kernel, "[ohos] 服务线程开始执行 tid={}",
                  static_cast<int>(GetCurrentThreadPointer(system.Kernel())->GetThreadId()));
         system.Kernel().CurrentScheduler()->OnThreadStart();
 

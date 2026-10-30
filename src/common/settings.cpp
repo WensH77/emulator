@@ -170,6 +170,14 @@ bool IsGPULevelNormal() {
 }
 
 bool IsFastmemEnabled() {
+#if defined(__OHOS__)
+    // 鸿蒙只能预留 160 GiB 虚拟空间，装不下 39 位 guest 地址的 fastmem 直映射
+    // （直映射会以 guest 虚拟地址作为预留区偏移，超过 160 GiB 就触发 HostMemory 断言）。
+    // 只有 NCE 必须直映射时才开启。
+    if (values.cpu_backend.GetValue() != CpuBackend::Nce) {
+        return false;
+    }
+#endif
     if (values.cpu_debug_mode)
         return bool(values.cpuopt_fastmem);
     return true;

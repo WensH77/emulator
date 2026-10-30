@@ -219,16 +219,15 @@ extern "C" int CitronOhosInitialize() {
             g_window->SetWindow(g_surface, u32(g_surface_width), u32(g_surface_height));
         }
     }
-    if (!g_root.empty()) {
-        const std::string log_path = g_root + "/citron_full.log";
-        setenv("CITRON_LOG_FILE", log_path.c_str(), 1);
-    }
     // 调试器一旦启用，KProcess::Run 会把主线程挂起等调试器（DebugSuspended=0x40），
     // 表现为应用线程 Runnable 但永远不执行。这里强制关闭。
     Settings::values.use_gdbstub = false;
+    // NCE 在鸿蒙上仍会崩（ld-musl，FAR=0x8），暂用 Dynarmic 跑通；修好 NCE 后删掉这一行。
+    Settings::values.cpu_backend = Settings::CpuBackend::Dynarmic;
     Common::Log::Initialize();
     LOG_INFO(Core, "[ohos] ======== 新的一次启动 ========");
-    Common::Log::SetGlobalFilter(Common::Log::Filter{Common::Log::Level::Trace});
+    // 只把 Info 及以上写进 hilog；逐事件的调度/IPC 日志已降到 Trace，需要时再开。
+    Common::Log::SetGlobalFilter(Common::Log::Filter{Common::Log::Level::Info});
     SetStatus("calling System::Initialize()");
     try {
         g_system->Initialize();
@@ -598,6 +597,17 @@ extern "C" int CitronOhosLoad(const char* path, int program_index) {
             std::setvbuf(f, nullptr, _IONBF, 0);
             dup2(fileno(f), 2);
             dup2(fileno(f), 1);
+        }
+    }
+    // 探针阶段在同一个 OHNativeWindow 上建了常驻 VkSurface；游戏渲染器再建一套会抢不到窗口，
+    // 帧进了 swapchain 但永远不上屏。加载前先把探针那套释放掉。
+    if (g_vk) {
+        if (g_vk->surface) {
+            OH_LOG_Print(LOG_APP, LOG_INFO, 0xD006, "VKCITRON", "Load: 释放探针 VkSurface");
+            g_vk->surface.reset();
+        }
+        if (g_vk->instance) {
+            g_vk->instance.reset();
         }
     }
     OH_LOG_Print(LOG_APP, LOG_INFO, 0xD006, "VKCITRON", "Load: 即将调用 System::Load");

@@ -274,8 +274,9 @@ void Swapchain::CreateSwapchain(const VkSurfaceCapabilitiesKHR& capabilities) {
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
         .queueFamilyIndexCount = 0,
         .pQueueFamilyIndices = nullptr,
-#ifdef ANDROID
-        // On Android, do not allow surface rotation to deviate from the frontend.
+#if defined(ANDROID) || defined(__OHOS__)
+        // 鸿蒙横屏时 currentTransform 是 ROTATE_90，交给合成器旋转会让画面整体转 90°；
+        // 与 Android 一样固定成 IDENTITY，由我们按窗口尺寸直接渲染。
         .preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
 #else
         .preTransform = capabilities.currentTransform,

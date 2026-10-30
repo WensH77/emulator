@@ -197,7 +197,7 @@ void KScheduler::Activate() {
 
     // m_state.should_count_idle = KTargetSystem::IsDebugMode();
     m_is_active = true;
-    LOG_INFO(Kernel, "[ohos] 核 {} Activate, needs_scheduling={}", m_core_id,
+    LOG_TRACE(Kernel, "[ohos] 核 {} Activate, needs_scheduling={}", m_core_id,
              static_cast<int>(m_state.needs_scheduling.load()));
     // 保证进入后至少调度一次，否则 Activate 返回会落到 std::unreachable()
     m_state.needs_scheduling.store(true, std::memory_order_relaxed);
@@ -456,7 +456,7 @@ void KScheduler::ScheduleImplFiber() {
         const auto pid = t->GetOwnerProcess() ? t->GetOwnerProcess()->GetProcessId() : 0;
         return fmt::format("{} (pid={})", t->GetThreadId(), pid);
     };
-    LOG_INFO(Kernel, "[ohos] 核 {} 切换线程 {} -> {}", m_core_id, describe(m_switch_cur_thread),
+    LOG_TRACE(Kernel, "[ohos] 核 {} 切换线程 {} -> {}", m_core_id, describe(m_switch_cur_thread),
              describe(m_switch_highest_priority_thread));
     KThread* const cur_thread{m_switch_cur_thread};
     KThread* highest_priority_thread{m_switch_highest_priority_thread};

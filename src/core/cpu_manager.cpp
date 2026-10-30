@@ -75,7 +75,7 @@ void CpuManager::HandleInterrupt() {
 ///////////////////////////////////////////////////////////////////////////////
 
 void CpuManager::MultiCoreRunGuestThread() {
-    LOG_INFO(Core, "[ohos] 核线程进入 guest 执行循环");
+    LOG_TRACE(Core, "[ohos] 核线程进入 guest 执行循环");
     // Similar to UserModeThreadStarter in HOS
     auto& kernel = system.Kernel();
     auto* thread = Kernel::GetCurrentThreadPointer(kernel);

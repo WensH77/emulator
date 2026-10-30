@@ -478,7 +478,7 @@ std::unique_ptr<InputDeviceType> CreateDeviceFromString(const std::string& param
     const auto pair = factory_list.find(engine);
     if (pair == factory_list.end()) {
         if (engine != "null") {
-            LOG_ERROR(Input, "Unknown engine name: {}", engine);
+            LOG_DEBUG(Input, "Unknown engine name: {}", engine);
         }
         return std::make_unique<InputDeviceType>();
     }
@@ -505,7 +505,7 @@ std::unique_ptr<InputDeviceType> CreateDevice(const ParamPackage& package) {
     const auto pair = factory_list.find(engine);
     if (pair == factory_list.end()) {
         if (engine != "null") {
-            LOG_ERROR(Input, "Unknown engine name: {}", engine);
+            LOG_DEBUG(Input, "Unknown engine name: {}", engine);
         }
         return std::make_unique<InputDeviceType>();
     }

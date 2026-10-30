@@ -279,7 +279,15 @@ AppLoader_DeconstructedRomDirectory::LoadResult AppLoader_DeconstructedRomDirect
     code_size += patch_ctx.GetTotalPatchSize();
 
     // Setup the process code layout
-    if (process.LoadFromMetadata(metadata, code_size, fastmem_base, is_hbl).IsError()) {
+    const auto load_from_metadata_result =
+        process.LoadFromMetadata(metadata, code_size, fastmem_base, is_hbl);
+    if (load_from_metadata_result.IsError()) {
+        LOG_CRITICAL(Loader,
+                     "[ohos-dbg] LoadFromMetadata failed: rc={:08X} code_size={:X} fastmem_base={:X} "
+                     "is_hbl={} addr_space={} pool={}",
+                     load_from_metadata_result.raw, code_size, fastmem_base, is_hbl,
+                     static_cast<int>(metadata.GetAddressSpaceType()),
+                     static_cast<int>(metadata.GetPoolPartition()));
         return {ResultStatus::ErrorUnableToParseKernelMetadata, {}};
     }
 
