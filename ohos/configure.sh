@@ -5,7 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="${1:-${CITRON_OHOS_DEPS:-/tmp/citron-ohos-deps}}"
 SDK=/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony
 CMAKE=$SDK/native/build-tools/cmake/bin/cmake
-COMMON="--target=aarch64-linux-ohos --sysroot=$SDK/native/sysroot -fPIC -DARCHITECTURE_arm64=1"
+COMMON="--target=aarch64-linux-ohos --sysroot=$SDK/native/sysroot -fPIC -DARCHITECTURE_arm64=1 -ffile-prefix-map=$ROOT=."
 
 export PATH=/opt/homebrew/bin:$PATH
 echo "依赖目录: $WORK"
