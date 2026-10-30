@@ -7,6 +7,10 @@
 - 本地仓库两个远端：`origin` 是上游（只读，用来同步），`mine` 是
   `https://github.com/WensH77/emulator.git`（写入口，`harmony` 跟踪它）。
 
+构建脚本会强制检查当前分支：不是 `harmony` 时 `configure.sh` / `build.sh` 直接报错退出
+（确需在其它分支构建时设 `CITRON_ALLOW_ANY_BRANCH=1`）。每次构建成功后会在
+`build-ohos/ohos-build-info.txt` 记下分支、提交号、时间和实际使用的依赖目录。
+
 ### 日常构建
 
 ```bash
