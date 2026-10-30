@@ -28,6 +28,24 @@ git add -A && git commit -m "..."
 git push                 # 推到 mine/harmony
 ```
 
+### 切分支后编译报 malformed AST file
+
+在 `main` 与 `harmony` 之间来回切换后，`build-ohos` 里的预编译头（PCH）会失效，
+因为它记录了只在 `harmony` 存在的 `src/common/ohos_ranges_compat.h`：
+
+```
+fatal error: malformed or corrupted AST file: could not find file
+  '.../src/common/ohos_ranges_compat.h' referenced by AST file '...cmake_pch.hxx.pch'
+```
+
+删掉 PCH 重编即可，不需要重新 configure：
+
+```bash
+find build-ohos -name "cmake_pch.hxx*" -delete
+find build-ohos -name "*.pch" -delete
+./ohos/build.sh
+```
+
 ### 跟上游同步
 
 ```bash
