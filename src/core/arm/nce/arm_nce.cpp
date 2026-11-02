@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <algorithm>
+#include <atomic>
 #include <cinttypes>
 #include <cstring>
 #include <iterator>
@@ -17,16 +18,23 @@
 #include "core/arm/nce/patcher.h"
 #include "core/core.h"
 #include "core/memory.h"
+#include "core/ohos_arena.h"
 
 #include "core/hle/kernel/k_process.h"
 
 #include <signal.h>
+#include <sys/mman.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
 namespace Core {
 
 namespace {
+
+// NCE 缺页分类统计：补零页、兜底模拟、页表已映射却缺页
+std::atomic<u64> g_zero_page_faults{0};
+std::atomic<u64> g_emulated_faults{0};
+std::atomic<u64> g_mapped_but_faulted{0};
 
 struct sigaction g_orig_bus_action;
 struct sigaction g_orig_segv_action;
@@ -263,11 +271,48 @@ bool ArmNce::HandleFailedGuestFault(GuestContext* guest_ctx, void* raw_info, voi
     const bool is_prefetch_abort = host_ctx.pc == fault_addr;
 
     if (!is_prefetch_abort) {
-        // Do what dynarmic does for the same access: it goes through Core::Memory, where an
-        // unmapped read returns 0 and an unmapped write is dropped. The one-instruction
-        // interpreter used for alignment faults runs the access through Core::Memory too, so
-        // NCE and dynarmic behave alike. Only an instruction it cannot decode is skipped.
-        // Either way the access is reported: it is a bug somewhere, and continuing hides where.
+        // 分类：这个地址在页表里是否本来就有映射。
+        const u64 fault_page = fault_addr & ~static_cast<u64>(Core::Memory::CITRON_PAGEMASK);
+        auto* const parent_process = parent->m_running_thread != nullptr
+                                         ? parent->m_running_thread->GetOwnerProcess()
+                                         : nullptr;
+        bool mapped_in_table = false;
+        if (parent_process != nullptr) {
+            Kernel::KPhysicalAddress phys{};
+            mapped_in_table = R_SUCCEEDED(
+                parent_process->GetPageTable().GetPhysicalAddress(&phys, fault_page));
+        }
+
+        if (mapped_in_table) {
+            // 页表里有映射却仍然缺页：fastmem 映射和页表不一致，是移植侧的 bug。
+            ++g_mapped_but_faulted;
+            if (g_mapped_but_faulted <= 8) {
+                LOG_CRITICAL(Core_ARM,
+                             "[ohos-dbg] NCE 映射不一致: addr={:#x} pc={:#x} 页表已映射但宿主缺页",
+                             fault_addr, host_ctx.pc);
+            }
+        } else {
+            // 本来未映射：按页补一个匿名零页并重新执行这条指令，避免逐条指令模拟。
+            const u64 arena_base =
+                reinterpret_cast<u64>(guest_ctx->system->DeviceMemory().buffer.VirtualBasePointer());
+            const u64 arena_size = Core::OhosArenaSizeBytes();
+            if (fault_page >= arena_base && fault_page < arena_base + arena_size) {
+                void* const remap = mmap(reinterpret_cast<void*>(fault_page), Core::Memory::CITRON_PAGESIZE,
+                                         PROT_READ | PROT_WRITE,
+                                         MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+                if (remap != MAP_FAILED) {
+                    ++g_zero_page_faults;
+                    if (g_zero_page_faults <= 8) {
+                        LOG_INFO(Core_ARM, "[ohos-dbg] NCE 补零页: addr={:#x} pc={:#x}", fault_addr,
+                                 host_ctx.pc);
+                    }
+                    return true; // PC 不变，重新执行该指令
+                }
+            }
+        }
+
+        // 兜底：保持和 dynarmic 一致（未映射读 0、写丢弃），逐条指令模拟。
+        ++g_emulated_faults;
         u32 instruction{};
         std::memcpy(&instruction, reinterpret_cast<const void*>(host_ctx.pc), sizeof(instruction));
         auto* const fpctx = GetFloatingPointState(host_ctx);

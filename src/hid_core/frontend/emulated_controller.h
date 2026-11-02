@@ -289,6 +289,10 @@ public:
      */
     void SetButtonParam(std::size_t index, Common::ParamPackage param);
 
+    /// 前端注入：直接设置某个按钮/摇杆的当前状态（鸿蒙手柄映射使用）
+    void SetButtonState(std::size_t index, bool pressed);
+    void SetStickState(std::size_t index, float x, float y);
+
     /**
      * Updates the current mapped stick device
      * @param param ParamPackage with controller data to be mapped

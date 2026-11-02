@@ -7,6 +7,7 @@
 #include <hilog/log.h>
 #include <new>
 
+#include <array>
 #include <atomic>
 #include <csignal>
 #include <execinfo.h>
@@ -43,11 +44,14 @@
 #include "common/signal_chain.h"
 #include "common/polyfill_thread.h"
 #include "common/settings.h"
+#include "common/settings_input.h"
 #include "common/settings.h"
 #include "common/fs/path_util.h"
 #include "common/logging.h"
 #include "common/settings.h"
 #include "core/core.h"
+#include "hid_core/hid_types.h"
+#include "hid_core/hid_core.h"
 #include "video_core/renderer_base.h"
 #include "video_core/rasterizer_interface.h"
 #include "core/cpu_manager.h"
@@ -711,6 +715,44 @@ extern "C" int CitronOhosLoadAsync(const char* path) {
         }
     }).detach();
     return 0;
+}
+
+extern "C" void CitronOhosSetPadState(unsigned long long buttons, float lx, float ly, float rx,
+                                     float ry) {
+    if (!g_system) {
+        return;
+    }
+    auto* const pad = g_system->HIDCore().GetEmulatedController(Core::HID::NpadIdType::Player1);
+    if (pad == nullptr) {
+        return;
+    }
+
+    // 位序与 Settings::NativeButton 对应：
+    // 0 A, 1 B, 2 X, 3 Y, 4 L, 5 R, 6 ZL, 7 ZR,
+    // 8 Plus, 9 Minus, 10 DLeft, 11 DUp, 12 DRight, 13 DDown
+    static constexpr std::array<int, 14> index_map{
+        Settings::NativeButton::A,      Settings::NativeButton::B,
+        Settings::NativeButton::X,      Settings::NativeButton::Y,
+        Settings::NativeButton::L,      Settings::NativeButton::R,
+        Settings::NativeButton::ZL,     Settings::NativeButton::ZR,
+        Settings::NativeButton::Plus,   Settings::NativeButton::Minus,
+        Settings::NativeButton::DLeft,  Settings::NativeButton::DUp,
+        Settings::NativeButton::DRight, Settings::NativeButton::DDown,
+    };
+    static unsigned long long last_buttons = 0;
+    for (std::size_t bit = 0; bit < index_map.size(); ++bit) {
+        const unsigned long long mask = 1ULL << bit;
+        const bool pressed = (buttons & mask) != 0;
+        const bool was_pressed = (last_buttons & mask) != 0;
+        if (pressed == was_pressed) {
+            continue;
+        }
+        pad->SetButtonState(static_cast<std::size_t>(index_map[bit]), pressed);
+    }
+    last_buttons = buttons;
+
+    pad->SetStickState(0, lx, ly);
+    pad->SetStickState(1, rx, ry);
 }
 
 extern "C" int CitronOhosRun() {

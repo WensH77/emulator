@@ -804,6 +804,25 @@ void EmulatedController::StartMotionCalibration() {
     }
 }
 
+void EmulatedController::SetButtonState(std::size_t index, bool pressed) {
+    Common::Input::CallbackStatus callback{};
+    callback.type = Common::Input::InputType::Button;
+    callback.button_status.value = pressed;
+    SetButton(callback, index, VIRTUAL_UUID);
+}
+
+void EmulatedController::SetStickState(std::size_t index, float x, float y) {
+    Common::Input::CallbackStatus callback{};
+    callback.type = Common::Input::InputType::Stick;
+    callback.stick_status.x.value = x;
+    callback.stick_status.y.value = y;
+    callback.stick_status.x.properties.range = 1.0f;
+    callback.stick_status.y.properties.range = 1.0f;
+    callback.stick_status.x.properties.threshold = 0.5f;
+    callback.stick_status.y.properties.threshold = 0.5f;
+    SetStick(callback, index, VIRTUAL_UUID);
+}
+
 void EmulatedController::SetButton(const Common::Input::CallbackStatus& callback, std::size_t index,
                                    Common::UUID uuid) {
     if (index >= controller.button_values.size()) {
