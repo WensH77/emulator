@@ -241,6 +241,9 @@ extern "C" int CitronOhosInitialize() {
     // 表现为应用线程 Runnable 但永远不执行。这里强制关闭。
     Settings::values.use_gdbstub = false;
     Settings::values.cpu_backend = Settings::CpuBackend::Nce;
+    // 异步编译着色器：新管线在后台编译，避免首次出现新效果时整帧停顿。
+    // 代价是刚出现的特效可能短暂缺失或闪烁。
+    Settings::values.use_asynchronous_shaders = true;
     Common::Log::Initialize();
     LOG_INFO(Core, "[ohos] ======== 新的一次启动 ========");
     // 只把 Info 及以上写进 hilog；逐事件的调度/IPC 日志已降到 Trace，需要时再开。
