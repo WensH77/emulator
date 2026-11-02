@@ -39,12 +39,15 @@
 #include <string>
 
 #include "common/logging.h"
+#include "common/polyfill_thread.h"
 #include "common/settings.h"
 #include "common/settings.h"
 #include "common/fs/path_util.h"
 #include "common/logging.h"
 #include "common/settings.h"
 #include "core/core.h"
+#include "video_core/renderer_base.h"
+#include "video_core/rasterizer_interface.h"
 #include "core/cpu_manager.h"
 #include "core/hle/kernel/physical_core.h"
 #include "core/core_timing.h"
@@ -190,6 +193,8 @@ extern "C" int CitronOhosProbe() {
     if (g_system) {
         return 0;
     }
+    // 先定后端再构造 System：DeviceMemory 的预留大小取决于是否 NCE
+    Settings::values.cpu_backend = Settings::CpuBackend::Dynarmic;
     SetStatus("constructing System");
     g_system = std::make_unique<Core::System>();
     g_probe_result = 0;
@@ -621,6 +626,26 @@ extern "C" int CitronOhosLoad(const char* path, int program_index) {
         const auto result = g_system->Load(*g_window, path, params);
         OH_LOG_Print(LOG_APP, LOG_INFO, 0xD006, "VKCITRON", "Load: System::Load 返回 %{public}d",
                      static_cast<int>(result));
+        // 前端负责初始化磁盘着色器缓存；鸿蒙端口之前漏了这一步，
+        // 导致 shader/<tid>/vulkan.bin 从不生成、每次启动都要重新编译管线。
+        if (result == Core::SystemResultStatus::Success &&
+            Settings::values.use_disk_shader_cache.GetValue()) {
+            try {
+                auto* rasterizer = g_system->Renderer().ReadRasterizer();
+                if (rasterizer) {
+                    OH_LOG_Print(LOG_APP, LOG_INFO, 0xD006, "VKCITRON",
+                                 "Load: 初始化磁盘着色器缓存 tid=%{public}016llx",
+                                 static_cast<unsigned long long>(
+                                     g_system->GetApplicationProcessProgramID()));
+                    rasterizer->LoadDiskResources(g_system->GetApplicationProcessProgramID(),
+                                                  std::stop_token{},
+                                                  [](VideoCore::LoadCallbackStage, int, int) {});
+                }
+            } catch (const std::exception& e) {
+                OH_LOG_Print(LOG_APP, LOG_WARN, 0xD006, "VKCITRON",
+                             "Load: 磁盘缓存初始化失败 %{public}s", e.what());
+            }
+        }
         SetStatus("Load: 返回码 " + std::to_string(static_cast<u32>(result)));
         return static_cast<int>(result);
     } catch (const std::exception& e) {
