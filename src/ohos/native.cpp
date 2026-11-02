@@ -51,6 +51,12 @@
 #include "common/logging.h"
 #include "common/settings.h"
 #include "core/core.h"
+#include "core/file_sys/vfs/vfs_real.h"
+#include "core/file_sys/romfs.h"
+#include "core/file_sys/control_metadata.h"
+#include "core/file_sys/content_archive.h"
+#include "core/file_sys/submission_package.h"
+#include "core/loader/loader.h"
 #include "hid_core/hid_types.h"
 #include "hid_core/hid_core.h"
 #include "video_core/renderer_base.h"
@@ -716,6 +722,93 @@ extern "C" int CitronOhosLoadAsync(const char* path) {
         }
     }).detach();
     return 0;
+}
+
+static std::string JsonQuote(const std::string& text) {
+    std::string out = "\"";
+    for (const char c : text) {
+        switch (c) {
+        case '"': out += "\\\""; break;
+        case '\\': out += "\\\\"; break;
+        case '\n': out += "\\n"; break;
+        case '\r': out += "\\r"; break;
+        case '\t': out += "\\t"; break;
+        default: out += c; break;
+        }
+    }
+    out += "\"";
+    return out;
+}
+
+extern "C" const char* CitronOhosQueryGameMeta(const char* path, const char* icon_dir) {
+    if (path == nullptr || icon_dir == nullptr) {
+        return "{\"ok\":false,\"error\":\"bad args\"}";
+    }
+    std::string result = "{\"ok\":false,\"error\":\"未知错误\"}";
+    try {
+        auto& keys = Core::Crypto::KeyManager::Instance();
+        if (!keys.AreKeysLoaded()) {
+            keys.ReloadKeys();
+        }
+        FileSys::RealVfsFilesystem vfs;
+        auto file = vfs.OpenFile(path);
+        if (file == nullptr) {
+            return "{\"ok\":false,\"error\":\"打不开文件\"}";
+        }
+        FileSys::NSP nsp(file);
+        if (nsp.GetStatus() != Loader::ResultStatus::Success) {
+            return "{\"ok\":false,\"error\":\"不是有效的 NSP\"}";
+        }
+        const u64 title_id = nsp.GetProgramTitleID();
+        std::string name;
+        std::string version;
+        std::string icon_path;
+
+        if (auto control_nca_file = nsp.GetNCAFile(title_id, FileSys::ContentRecordType::Control)) {
+            FileSys::NCA control_nca(control_nca_file);
+            if (control_nca.GetStatus() == Loader::ResultStatus::Success) {
+                if (auto romfs = control_nca.GetRomFS()) {
+                    if (auto extracted = FileSys::ExtractRomFS(romfs)) {
+                        auto nacp_file = extracted->GetFile("control.nacp");
+                        if (nacp_file == nullptr) {
+                            nacp_file = extracted->GetFile("Control.nacp");
+                        }
+                        if (nacp_file != nullptr) {
+                            FileSys::NACP nacp(nacp_file);
+                            name = nacp.GetApplicationName();
+                            version = nacp.GetVersionString();
+                        }
+                        for (const auto* lang : FileSys::LANGUAGE_NAMES) {
+                            auto icon_file = extracted->GetFile(std::string("icon_").append(lang).append(".dat"));
+                            if (icon_file == nullptr) {
+                                continue;
+                            }
+                            icon_path = std::string(icon_dir) + "/" + fmt::format("{:016x}", title_id) + ".jpg";
+                            const auto bytes = icon_file->ReadAllBytes();
+                            if (auto* out = std::fopen(icon_path.c_str(), "wb")) {
+                                std::fwrite(bytes.data(), 1, bytes.size(), out);
+                                std::fclose(out);
+                            } else {
+                                icon_path.clear();
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        result = fmt::format(
+            "{{\"ok\":true,\"title_id\":\"{:016x}\",\"name\":{},\"version\":{},\"icon\":{}}}",
+            title_id, JsonQuote(name), JsonQuote(version), JsonQuote(icon_path));
+    } catch (const std::exception& e) {
+        result = fmt::format("{{\"ok\":false,\"error\":{}}}", JsonQuote(e.what()));
+    } catch (...) {
+        result = "{\"ok\":false,\"error\":\"unknown\"}";
+    }
+    static std::string cached;
+    cached = result;
+    return cached.c_str();
 }
 
 extern "C" void CitronOhosSetPadState(unsigned long long buttons, float lx, float ly, float rx,
