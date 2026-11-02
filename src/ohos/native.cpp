@@ -475,10 +475,12 @@ extern "C" int CitronOhosTestClear() {
         dd.vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                                 VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1,
                                 &to_dst);
+        // 探针清屏用黑色：启动游戏时这帧会一直留到游戏出第一帧，
+        // 绿色会让人以为花屏。
         VkClearColorValue color{};
-        color.float32[0] = 0.1f;
-        color.float32[1] = 0.8f;
-        color.float32[2] = 0.2f;
+        color.float32[0] = 0.0f;
+        color.float32[1] = 0.0f;
+        color.float32[2] = 0.0f;
         color.float32[3] = 1.0f;
         dd.vkCmdClearColorImage(cmd, images[index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &color, 1,
                                 &range);
@@ -690,6 +692,16 @@ extern "C" int CitronOhosReloadKeys() {
         SetStatus("ReloadKeys threw unknown exception");
         return 62;
     }
+}
+
+extern "C" unsigned long long CitronOhosGetFrameCount() {
+    return Tegra::g_ohos_composited_frames.load(std::memory_order_relaxed);
+}
+
+extern "C" int CitronOhosInitOnly() {
+    // 游戏启动路径只需要 System 初始化；探针的 TestSurface/TestClear 会留下
+    // 一帧占位画面，启动游戏时不需要。
+    return CitronOhosInitialize();
 }
 
 extern "C" int CitronOhosLoadAsync(const char* path) {
