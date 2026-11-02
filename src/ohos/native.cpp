@@ -16,6 +16,7 @@
 #include <sys/mman.h>
 #include <sys/syscall.h>
 #include <cstdio>
+#include <cmath>
 #include <cstring>
 #include <cstring>
 #include <memory>
@@ -757,7 +758,9 @@ extern "C" void CitronOhosSetPadState(unsigned long long buttons, float lx, floa
     }
     last_buttons = buttons;
 
-    if ((lx != 0.0f || ly != 0.0f || rx != 0.0f || ry != 0.0f) && axis_logs < 4) {
+    const bool large_axis = std::abs(lx) > 0.5f || std::abs(ly) > 0.5f ||
+                            std::abs(rx) > 0.5f || std::abs(ry) > 0.5f;
+    if (large_axis && axis_logs < 8) {
         ++axis_logs;
         LOG_INFO(Core, "[ohos-dbg] pad 摇杆 lx={:.2f} ly={:.2f} rx={:.2f} ry={:.2f}", lx, ly, rx, ry);
     }
