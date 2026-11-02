@@ -740,6 +740,8 @@ extern "C" void CitronOhosSetPadState(unsigned long long buttons, float lx, floa
         Settings::NativeButton::DRight, Settings::NativeButton::DDown,
     };
     static unsigned long long last_buttons = 0;
+    static int button_logs = 0;
+    static int axis_logs = 0;
     for (std::size_t bit = 0; bit < index_map.size(); ++bit) {
         const unsigned long long mask = 1ULL << bit;
         const bool pressed = (buttons & mask) != 0;
@@ -748,9 +750,17 @@ extern "C" void CitronOhosSetPadState(unsigned long long buttons, float lx, floa
             continue;
         }
         pad->SetButtonState(static_cast<std::size_t>(index_map[bit]), pressed);
+        if (button_logs < 8) {
+            ++button_logs;
+            LOG_INFO(Core, "[ohos-dbg] pad 按键 bit={} pressed={}", bit, pressed);
+        }
     }
     last_buttons = buttons;
 
+    if ((lx != 0.0f || ly != 0.0f || rx != 0.0f || ry != 0.0f) && axis_logs < 4) {
+        ++axis_logs;
+        LOG_INFO(Core, "[ohos-dbg] pad 摇杆 lx={:.2f} ly={:.2f} rx={:.2f} ry={:.2f}", lx, ly, rx, ry);
+    }
     pad->SetStickState(0, lx, ly);
     pad->SetStickState(1, rx, ry);
 }
