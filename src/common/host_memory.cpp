@@ -465,8 +465,6 @@ static void* ChooseVirtualBase(size_t virtual_size) {
         // Calculate a possible location.
         uintptr_t hint_address = ((rng() % range) + lower) * HugePageSize;
 
-        // Try to map.
-        // Note: we may be able to take advantage of MAP_FIXED_NOREPLACE here.
         void* map_pointer =
             mmap(reinterpret_cast<void*>(hint_address), virtual_size, PROT_READ | PROT_WRITE,
                  MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
@@ -533,7 +531,13 @@ public:
             // XXX Drop after FreeBSD 12.* reaches EOL on 2024-06-30
             fds[0] = shm_open(SHM_ANON, O_RDWR, 0600);
 #else
-            fds[0] = memfd_create("HostMemory", 0);
+            // 新内核的 memfd_noexec 策略：不带 MFD_EXEC 创建的 memfd 不允许
+            // mprotect(PROT_EXEC)，NCE 执行 guest 代码会拿到 EACCES。
+            constexpr unsigned int MfdExec = 0x0004U;
+            fds[0] = memfd_create("HostMemory", MfdExec);
+            if (fds[0] < 0) {
+                fds[0] = memfd_create("HostMemory", 0);
+            }
 #endif
             if (fds[0] < 0) {
                 LOG_CRITICAL(HW_Memory, "memfd_create failed: {}", strerror(errno));
@@ -558,14 +562,16 @@ public:
                           MAP_SHARED | MAP_FIXED, fds[offset / chunk_size], 0) != MAP_FAILED;
         }
         if (!mapped) {
-            LOG_CRITICAL(HW_Memory, "mmap failed: {}", strerror(errno));
+            LOG_CRITICAL(HW_Memory, "backing mmap failed: errno={} ({}) backing_size={:#x}",
+                         errno, strerror(errno), backing_size);
             throw std::bad_alloc{};
         }
 
         // Virtual memory initialization
         virtual_base = virtual_map_base = static_cast<u8*>(ChooseVirtualBase(virtual_size));
         if (virtual_base == MAP_FAILED) {
-            LOG_CRITICAL(HW_Memory, "mmap failed: {}", strerror(errno));
+            LOG_CRITICAL(HW_Memory, "virtual reserve failed: errno={} ({}) virtual_size={:#x}",
+                         errno, strerror(errno), virtual_size);
             throw std::bad_alloc{};
         }
 #if defined(__linux__)
@@ -752,6 +758,21 @@ public:
             layout_lock.lock();
             ret = mprotect(virtual_base + virtual_offset, length, flags);
         }
+#if defined(__OHOS__)
+        if (ret != 0 && execute && errno == EACCES) {
+            // 鸿蒙不允许把 memfd 后端映射成可执行，但允许匿名内存可执行。
+            // NCE 要就地执行 guest 代码：把这段换成匿名映射并保留原有内容。
+            void* const addr = virtual_base + virtual_offset;
+            std::vector<u8> backup(length);
+            std::memcpy(backup.data(), addr, length);
+            void* const remap = mmap(addr, length, PROT_READ | PROT_WRITE,
+                                     MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+            if (remap != MAP_FAILED) {
+                std::memcpy(addr, backup.data(), length);
+                ret = mprotect(addr, length, flags);
+            }
+        }
+#endif
         assert(ret == 0 && "mprotect failed: {}" && (void(errno), true));
         layout_lock.unlock();
         RequestVmaSample();
@@ -1075,7 +1096,9 @@ HostMemory::HostMemory(size_t backing_size_, size_t virtual_size_,
     // Try to allocate a fastmem arena.
     // The implementation will fail with std::bad_alloc on errors.
     impl = std::make_unique<HostMemory::Impl>(AlignUp(backing_size, PageAlignment),
-                                              AlignUp(virtual_size, PageAlignment) + HugePageSize,
+                                              // 多要 2 MiB 的 slack 在鸿蒙上会把 160 GiB 顶到上限之外，
+                                              // ChooseVirtualBase 返回的地址本来就是 2 MiB 对齐的，不需要这段多余。
+                                              AlignUp(virtual_size, PageAlignment),
                                               backing_fds, chunk_size);
     backing_base = impl->backing_base;
     virtual_base = impl->virtual_base;

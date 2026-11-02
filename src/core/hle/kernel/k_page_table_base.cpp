@@ -7,6 +7,7 @@
 #include "common/scope_exit.h"
 #include "common/settings.h"
 #include "core/core.h"
+#include "core/ohos_arena.h"
 #include "core/hle/kernel/k_address_space_info.h"
 #include "core/hle/kernel/k_page_table_base.h"
 #ifdef __OHOS__
@@ -413,7 +414,7 @@ Result KPageTableBase::InitializeForProcess(Svc::CreateProcessFlag as_type, bool
     // 一旦选到超过 arena 的地址 HostMemory 就会断言失败。
     // 这里把所有 guest 虚拟区域压进 arena 范围。
     {
-        constexpr size_t OhosArenaSize = (1ULL << 37) + (1ULL << 35); // 160 GiB，与 DeviceMemory 一致
+        const size_t OhosArenaSize = Core::OhosArenaSizeBytes(); // 与 DeviceMemory 实际预留一致
         // NCE 直映射时 arena 并不落在 0，DeviceMemory 把 guest 地址整体挪到 arena 基址上
         // （aslr_space_start 即 arena 基址）。上限必须跟着基址走，否则每个区域都会被压到
         // 同一段地址里互相重叠，CanContain 会把这些区域判成 heap/alias 并返回 0xD401。

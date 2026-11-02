@@ -11,6 +11,9 @@
 #endif
 #include "core/core.h"
 #include "core/core_timing.h"
+#include <csignal>
+#include <pthread.h>
+
 #include "core/cpu_manager.h"
 #include "core/hle/kernel/k_interrupt_manager.h"
 #include "core/hle/kernel/k_scheduler.h"
@@ -199,6 +202,13 @@ void CpuManager::ShutdownThread() {
 
 void CpuManager::RunThread(std::stop_token token, std::size_t core) {
     /// Initialization
+    // 这些线程由 ArkTS/NAPI 线程创建，会继承它屏蔽的信号。NCE 依赖 SIGSEGV
+    // 处理 guest 访问异常，掩码被继承时内核会直接按默认动作杀掉进程。
+    {
+        sigset_t empty_mask;
+        sigemptyset(&empty_mask);
+        pthread_sigmask(SIG_SETMASK, &empty_mask, nullptr);
+    }
     system.RegisterCoreThread(core);
     std::string name;
     if (is_multicore) {

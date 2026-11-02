@@ -22,6 +22,7 @@
 #include <filesystem>
 #include <map>
 #include <chrono>
+#include <pthread.h>
 #include <thread>
 #include <csignal>
 #include <execinfo.h>
@@ -39,6 +40,7 @@
 #include <string>
 
 #include "common/logging.h"
+#include "common/signal_chain.h"
 #include "common/polyfill_thread.h"
 #include "common/settings.h"
 #include "common/settings.h"
@@ -156,7 +158,7 @@ static void InstallCrashHandlers() {
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_SIGINFO | SA_NODEFER;
     for (int sig : {SIGSEGV, SIGBUS, SIGABRT, SIGILL, SIGFPE}) {
-        sigaction(sig, &sa, nullptr);
+        Common::SigAction(sig, &sa, nullptr);
     }
 }
 
@@ -194,7 +196,7 @@ extern "C" int CitronOhosProbe() {
         return 0;
     }
     // 先定后端再构造 System：DeviceMemory 的预留大小取决于是否 NCE
-    Settings::values.cpu_backend = Settings::CpuBackend::Dynarmic;
+    Settings::values.cpu_backend = Settings::CpuBackend::Nce;
     SetStatus("constructing System");
     g_system = std::make_unique<Core::System>();
     g_probe_result = 0;
@@ -227,8 +229,7 @@ extern "C" int CitronOhosInitialize() {
     // 调试器一旦启用，KProcess::Run 会把主线程挂起等调试器（DebugSuspended=0x40），
     // 表现为应用线程 Runnable 但永远不执行。这里强制关闭。
     Settings::values.use_gdbstub = false;
-    // NCE 在鸿蒙上仍会崩（ld-musl，FAR=0x8），暂用 Dynarmic 跑通；修好 NCE 后删掉这一行。
-    Settings::values.cpu_backend = Settings::CpuBackend::Dynarmic;
+    Settings::values.cpu_backend = Settings::CpuBackend::Nce;
     Common::Log::Initialize();
     LOG_INFO(Core, "[ohos] ======== 新的一次启动 ========");
     // 只把 Info 及以上写进 hilog；逐事件的调度/IPC 日志已降到 Trace，需要时再开。
@@ -596,6 +597,7 @@ extern "C" int CitronOhosLoad(const char* path, int program_index) {
     InstallCrashHandlers();
     InstallDumpHandler();
     OH_LOG_Print(LOG_APP, LOG_INFO, 0xD006, "VKCITRON", "Load: crash handler 安装完成");
+
     if (!g_root.empty()) {
         const std::string log_path = g_root + "/citron_stderr.log";
         if (FILE* f = std::fopen(log_path.c_str(), "w")) {
@@ -685,6 +687,11 @@ extern "C" int CitronOhosLoadAsync(const char* path) {
     }
     std::string p{path};
     std::thread([p]() {
+        // ArkTS/NAPI 线程可能屏蔽了部分信号，子线程会继承。同步 SIGSEGV 被屏蔽时
+        // 内核直接按默认动作杀进程，我们的崩溃处理器根本收不到信号。这里先清空掩码。
+        sigset_t empty_mask;
+        sigemptyset(&empty_mask);
+        pthread_sigmask(SIG_SETMASK, &empty_mask, nullptr);
         OH_LOG_Print(LOG_APP, LOG_INFO, 0xD006, "VKCITRON", "async Load 开始: %{public}s", p.c_str());
         const int rc = CitronOhosLoad(p.c_str(), 0);
         OH_LOG_Print(LOG_APP, LOG_INFO, 0xD006, "VKCITRON", "async Load 返回 rc=%{public}d status=%{public}s",
@@ -695,7 +702,8 @@ extern "C" int CitronOhosLoadAsync(const char* path) {
             // 否则 Applet 构造里请求 hid 服务会一直等下去。
             CitronOhosRun();
             // 合成帧测试暂不调用：它会让进程崩溃，挡住后续诊断
-            CitronOhosDiagnose();
+            // Diagnose 在 NCE 下读取 guest 线程上下文会崩，先关掉验证主流程
+            // CitronOhosDiagnose();
             std::thread([] { CitronOhosHeartbeat(); }).detach();
             // 不再由前端创建 WindowSystem/EventObserver：
             // guest 侧的 AM 系统模块（Service::AM::LoopProcess）自己会创建，
@@ -706,11 +714,17 @@ extern "C" int CitronOhosLoadAsync(const char* path) {
 }
 
 extern "C" int CitronOhosRun() {
+    sigset_t empty_mask;
+    sigemptyset(&empty_mask);
+    pthread_sigmask(SIG_SETMASK, &empty_mask, nullptr);
     if (!g_system) {
         SetStatus("Run: System 未初始化");
         return 80;
     }
     OH_LOG_Print(LOG_APP, LOG_INFO, 0xD006, "VKCITRON", "Run: 进入模拟主循环");
+    OH_LOG_Print(LOG_APP, LOG_INFO, 0xD006, "VKCITRON", "Run: NCE=%{public}d fastmem=%{public}d",
+                 static_cast<int>(Settings::IsNceEnabled()),
+                 static_cast<int>(Settings::IsFastmemEnabled()));
     try {
         g_system->Run();
         // 唤醒空闲的物理核：线程被置为 Runnable 后若没有中断，核会一直睡在 Idle()

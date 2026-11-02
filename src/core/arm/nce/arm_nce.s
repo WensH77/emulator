@@ -106,6 +106,8 @@ _ZN4Core6ArmNce50ReturnToRunCodeByExceptionLevelChangeSignalHandlerEiPvS1_:
 _ZN4Core6ArmNce29BreakFromRunCodeSignalHandlerEiPvS1_:
     /* Check to see if we have the correct TLS magic. */
     mrs     x8, tpidr_el0
+    /* tpidr_el0 为 0 时按 host fault 处理，避免在信号处理器里二次崩溃 */
+    cbz     x8, 8f
     ldr     w9, [x8, #(TpidrEl0TlsMagic)]
 
     LOAD_IMMEDIATE_32(w10, TlsMagic)
@@ -137,6 +139,8 @@ _ZN4Core6ArmNce29BreakFromRunCodeSignalHandlerEiPvS1_:
 _ZN4Core6ArmNce32GuestAlignmentFaultSignalHandlerEiPvS1_:
     /* Check to see if we have the correct TLS magic. */
     mrs     x8, tpidr_el0
+    /* tpidr_el0 为 0 时按 host fault 处理，避免在信号处理器里二次崩溃 */
+    cbz     x8, 8f
     ldr     w9, [x8, #(TpidrEl0TlsMagic)]
 
     LOAD_IMMEDIATE_32(w10, TlsMagic)
@@ -183,6 +187,8 @@ _ZN4Core6ArmNce32GuestAlignmentFaultSignalHandlerEiPvS1_:
 _ZN4Core6ArmNce29GuestAccessFaultSignalHandlerEiPvS1_:
     /* Check to see if we have the correct TLS magic. */
     mrs     x8, tpidr_el0
+    /* tpidr_el0 为 0 时按 host fault 处理，避免在信号处理器里二次崩溃 */
+    cbz     x8, 8f
     ldr     w9, [x8, #(TpidrEl0TlsMagic)]
 
     LOAD_IMMEDIATE_32(w10, TlsMagic)
@@ -221,6 +227,9 @@ _ZN4Core6ArmNce29GuestAccessFaultSignalHandlerEiPvS1_:
     ldr     x19, [sp, #0x10]
     ldp     x29, x30, [sp], #0x20
     ret
+
+8:
+    b       _ZN4Core6ArmNce21HandleHostAccessFaultEiPvS1_
 
 
 /* static void Core::ArmNce::LockThreadParameters(void* tpidr) */
