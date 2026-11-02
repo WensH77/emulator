@@ -318,6 +318,51 @@ Result KPageTableBase::InitializeForProcess(Svc::CreateProcessFlag as_type, bool
         m_alias_region_extra_size = alias_region_extra_size;
     }
 
+#ifdef __OHOS__
+    // 鸿蒙上能预留的虚拟地址空间随设备内存状况变化。按实际预算等比收窄
+    // alias / kernel_map / heap 三个大区域，保证布局能装进 arena。
+    if (m_address_space_width == 39 && Settings::IsNceEnabled()) {
+        constexpr size_t MiB = 1ULL << 20;
+        constexpr size_t GiB = 1ULL << 30;
+        const size_t arena = Core::OhosArenaSizeBytes();
+        const size_t overhead = GetInteger(process_code_end) - GetInteger(m_code_region_start) + GiB;
+        const size_t budget = arena > overhead ? arena - overhead : 0;
+        const size_t total = alias_region_size + heap_region_size + stack_region_size +
+                             kernel_map_region_size;
+        if (total > budget) {
+            const size_t alias_min = std::min<size_t>(alias_region_size, 8 * GiB);
+            const size_t kmap_min = std::min<size_t>(kernel_map_region_size, 8 * GiB);
+            const size_t heap_min = std::min<size_t>(heap_region_size, 4 * GiB);
+            const size_t fixed = stack_region_size + alias_min + kmap_min + heap_min;
+            if (budget > fixed) {
+                const size_t flexible = budget - fixed;
+                const size_t w_alias = alias_region_size - alias_min;
+                const size_t w_kmap = kernel_map_region_size - kmap_min;
+                const size_t w_heap = heap_region_size - heap_min;
+                const size_t w_total = w_alias + w_kmap + w_heap;
+                if (w_total != 0) {
+                    alias_region_size = alias_min + flexible * w_alias / w_total;
+                    kernel_map_region_size = kmap_min + flexible * w_kmap / w_total;
+                    heap_region_size = heap_min + flexible * w_heap / w_total;
+                }
+            } else {
+                alias_region_size = alias_min;
+                kernel_map_region_size = kmap_min;
+                heap_region_size = heap_min;
+            }
+            alias_region_size = Common::AlignDown(alias_region_size, RegionAlignment);
+            kernel_map_region_size =
+                Common::AlignDown(kernel_map_region_size, RegionAlignment);
+            heap_region_size = Common::AlignDown(heap_region_size, RegionAlignment);
+        }
+        LOG_INFO(Core,
+                 "[ohos-dbg] arena 预算={} MiB 需求(原始)={} MiB → alias={} MiB kmap={} MiB "
+                 "heap={} MiB stack={} MiB",
+                 budget / MiB, total / MiB, alias_region_size / MiB,
+                 kernel_map_region_size / MiB, heap_region_size / MiB, stack_region_size / MiB);
+    }
+#endif
+
     const size_t needed_size =
         (alias_region_size + heap_region_size + stack_region_size + kernel_map_region_size);
     R_UNLESS(alloc_size >= needed_size, ResultOutOfMemory);
