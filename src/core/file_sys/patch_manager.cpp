@@ -1241,19 +1241,19 @@ PatchManager::Metadata PatchManager::GetControlMetadata() const {
         } else {
             control_nca = content_provider.GetEntry(update_tid, ContentRecordType::Control);
         }
-        LOG_INFO(Loader, "GetControlMetadata: update control_nca={}", control_nca != nullptr);
+        LOG_DEBUG(Loader, "GetControlMetadata: update control_nca={}", control_nca != nullptr);
     }
 
     if (control_nca == nullptr) {
         control_nca = content_provider.GetEntry(title_id, ContentRecordType::Control);
-        LOG_INFO(Loader, "GetControlMetadata: base control_nca={}", control_nca != nullptr);
+        LOG_DEBUG(Loader, "GetControlMetadata: base control_nca={}", control_nca != nullptr);
     }
 
     if (control_nca == nullptr) {
-        LOG_WARNING(Loader, "GetControlMetadata: no control NCA for title_id={:016X}", title_id);
+        LOG_DEBUG(Loader, "GetControlMetadata: no control NCA for title_id={:016X}", title_id);
         return {};
     }
-    LOG_INFO(Loader, "GetControlMetadata: selected control status={}, type={:02X}",
+    LOG_DEBUG(Loader, "GetControlMetadata: selected control status={}, type={:02X}",
              static_cast<u32>(control_nca->GetStatus()), static_cast<u32>(control_nca->GetType()));
     return ParseControlNCA(*control_nca);
 }

@@ -810,7 +810,7 @@ VkFormat Device::GetSupportedFormat(VkFormat wanted_format, VkFormatFeatureFlags
     // The wanted format is not supported by hardware, search for alternatives
     const VkFormat* alternatives = GetFormatAlternatives(wanted_format);
     if (alternatives == nullptr) {
-        LOG_ERROR(Render_Vulkan,
+        LOG_DEBUG(Render_Vulkan,
                   "Format={} with usage={} and type={} has no defined alternatives and host "
                   "hardware does not support it",
                   wanted_format, wanted_usage, format_type);

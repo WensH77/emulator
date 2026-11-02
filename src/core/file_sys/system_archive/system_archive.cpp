@@ -73,7 +73,7 @@ VirtualFile SynthesizeSystemArchive(const u64 title_id) {
 
     const auto& desc = SYSTEM_ARCHIVES[title_id - SYSTEM_ARCHIVE_BASE_TITLE_ID];
 
-    LOG_INFO(Service_FS, "Synthesizing system archive '{}' (0x{:016X}).", desc.name, desc.title_id);
+    LOG_DEBUG(Service_FS, "Synthesizing system archive '{}' (0x{:016X}).", desc.name, desc.title_id);
 
     if (desc.supplier == nullptr) {
         return nullptr;
