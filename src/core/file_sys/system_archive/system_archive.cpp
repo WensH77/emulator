@@ -91,7 +91,7 @@ VirtualFile SynthesizeSystemArchive(const u64 title_id) {
         return nullptr;
     }
 
-    LOG_INFO(Service_FS, "    - System archive generation successful!");
+    LOG_DEBUG(Service_FS, "    - System archive generation successful!");
     return romfs;
 }
 } // namespace FileSys::SystemArchive

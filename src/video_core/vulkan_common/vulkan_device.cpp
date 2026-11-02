@@ -1091,7 +1091,7 @@ bool Device::GetSuitability(bool requires_swapchain) {
 
 #define LOG_EXTENSION(extension_name)                                                              \
     if (!loaded_extensions.contains(extension_name)) {                                             \
-        LOG_INFO(Render_Vulkan, "Device doesn't support extension {}", extension_name);            \
+        LOG_DEBUG(Render_Vulkan, "Device doesn't support extension {}", extension_name);            \
     }
 
     FOR_EACH_VK_RECOMMENDED_EXTENSION(LOG_EXTENSION);
